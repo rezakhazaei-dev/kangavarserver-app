@@ -59,4 +59,10 @@ class UtilsTest {
         assertFalse(Utils.isIpInCidr("192.168.1.1", "invalid-cidr"))
     }
 
+    @Test
+    fun test_isXray() {
+        // The rebranded applicationId must still produce Xray-style configs.
+        assertTrue(Utils.isXray())
+    }
+
 }

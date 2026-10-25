@@ -568,4 +568,47 @@
     <string name="sub_info_open_page">Открыть страницу подписки</string>
     <string name="sub_info_unlimited">Без ограничений</string>
 
+    <!-- Bazhiko navigation, home and subscription tabs -->
+    <string name="tab_home">Главная</string>
+    <string name="tab_servers">Серверы</string>
+    <string name="tab_subscription">Подписка</string>
+    <string name="tab_more">Настройки</string>
+    <string name="home_status_disconnected">Нет подключения</string>
+    <string name="home_status_connecting">Подключение…</string>
+    <string name="home_status_connected">Защита включена</string>
+    <string name="home_title_disconnected">Готово к подключению</string>
+    <string name="home_title_connecting">Подключение</string>
+    <string name="home_title_connected">Подключено</string>
+    <string name="home_hint_disconnected">Нажмите кнопку, чтобы подключиться</string>
+    <string name="home_hint_connecting">Устанавливается защищённое соединение…</string>
+    <string name="home_current_server">Текущий сервер</string>
+    <string name="home_no_server">Выберите сервер</string>
+    <string name="home_no_server_hint">Добавьте подписку, чтобы увидеть серверы</string>
+    <string name="home_remaining_traffic">Остаток трафика</string>
+    <string name="home_traffic_of">%1$s из %2$s</string>
+    <string name="home_expired">Истекла</string>
+    <string name="home_ping">Пинг</string>
+    <string name="home_test_ping">Проверить пинг</string>
+    <string name="home_paste_link">Добавить ссылку из буфера обмена</string>
+    <string name="sub_tab_title">Моя подписка</string>
+    <string name="sub_tab_empty_title">Подписки пока нет</string>
+    <string name="sub_tab_empty_hint">Добавьте ссылку на подписку или получите бесплатный пробный период в нашем Telegram-боте.</string>
+    <string name="sub_tab_add">Добавить подписку</string>
+    <string name="sub_tab_used">Использовано</string>
+    <string name="sub_tab_remaining">осталось</string>
+    <string name="sub_tab_expires">Истекает</string>
+    <string name="sub_tab_renew">Продлить</string>
+    <string name="sub_tab_support">Поддержка</string>
+    <string name="sub_tab_reseller_title">Панель реселлера, до 150% прибыли</string>
+    <string name="sub_tab_reseller_action">Запрос через Telegram-бота</string>
+    <string name="more_title">Настройки</string>
+    <string name="more_telegram_channel">Telegram-канал</string>
+    <string name="more_support_bot">Поддержка и покупка</string>
+    <plurals name="home_days_left">
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дня</item>
+        <item quantity="many">%d дней</item>
+        <item quantity="other">%d дня</item>
+    </plurals>
+
 </resources>

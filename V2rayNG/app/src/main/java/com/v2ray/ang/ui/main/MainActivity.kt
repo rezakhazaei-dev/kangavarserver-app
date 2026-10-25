@@ -199,6 +199,7 @@ class MainActivity : HelperBaseComponentActivity() {
             checkAndRequestPermission(PermissionType.ACCESS_LOCAL_NETWORK) {}
         }
         LauncherManager.startService(this)
+        mainViewModel.markConnecting()
     }
 
     private fun importManually(createConfigType: Int) {

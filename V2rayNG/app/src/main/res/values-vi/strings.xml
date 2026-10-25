@@ -562,4 +562,44 @@
     <string name="sub_info_open_page">Mở trang thông tin đăng ký</string>
     <string name="sub_info_unlimited">Không giới hạn</string>
 
+    <!-- Bazhiko navigation, home and subscription tabs -->
+    <string name="tab_home">Trang chủ</string>
+    <string name="tab_servers">Máy chủ</string>
+    <string name="tab_subscription">Gói đăng ký</string>
+    <string name="tab_more">Cài đặt</string>
+    <string name="home_status_disconnected">Chưa kết nối</string>
+    <string name="home_status_connecting">Đang kết nối…</string>
+    <string name="home_status_connected">Đang được bảo vệ</string>
+    <string name="home_title_disconnected">Sẵn sàng kết nối</string>
+    <string name="home_title_connecting">Đang kết nối</string>
+    <string name="home_title_connected">Đã kết nối</string>
+    <string name="home_hint_disconnected">Chạm vào nút để kết nối</string>
+    <string name="home_hint_connecting">Đang thiết lập kết nối an toàn…</string>
+    <string name="home_current_server">Máy chủ hiện tại</string>
+    <string name="home_no_server">Chọn một máy chủ</string>
+    <string name="home_no_server_hint">Thêm gói đăng ký để xem máy chủ</string>
+    <string name="home_remaining_traffic">Dung lượng còn lại</string>
+    <string name="home_traffic_of">%1$s / %2$s</string>
+    <string name="home_expired">Đã hết hạn</string>
+    <string name="home_ping">Ping</string>
+    <string name="home_test_ping">Kiểm tra ping</string>
+    <string name="home_paste_link">Thêm liên kết từ bộ nhớ tạm</string>
+    <string name="sub_tab_title">Gói của tôi</string>
+    <string name="sub_tab_empty_title">Chưa có gói đăng ký</string>
+    <string name="sub_tab_empty_hint">Thêm liên kết đăng ký, hoặc nhận dùng thử miễn phí từ bot Telegram.</string>
+    <string name="sub_tab_add">Thêm gói đăng ký</string>
+    <string name="sub_tab_used">Đã dùng</string>
+    <string name="sub_tab_remaining">còn lại</string>
+    <string name="sub_tab_expires">Hết hạn</string>
+    <string name="sub_tab_renew">Gia hạn</string>
+    <string name="sub_tab_support">Hỗ trợ</string>
+    <string name="sub_tab_reseller_title">Bảng đại lý, lợi nhuận đến 150%</string>
+    <string name="sub_tab_reseller_action">Yêu cầu qua bot Telegram</string>
+    <string name="more_title">Cài đặt</string>
+    <string name="more_telegram_channel">Kênh Telegram</string>
+    <string name="more_support_bot">Hỗ trợ và mua hàng</string>
+    <plurals name="home_days_left">
+        <item quantity="other">%d ngày</item>
+    </plurals>
+
 </resources>

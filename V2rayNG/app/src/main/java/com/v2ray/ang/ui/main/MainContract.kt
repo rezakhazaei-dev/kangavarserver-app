@@ -21,6 +21,11 @@ data class MainUiState(
     val selectedGroupId: String = "",
     val selectedGuid: String? = null,
     val isRunning: Boolean = false,
+    /** A start was requested and the service has not reported success or failure yet. */
+    val isConnecting: Boolean = false,
+    /** When this session's connection started; null when unknown or not connected. */
+    val connectedSinceMillis: Long? = null,
+    val selectedServer: SelectedServerUiModel? = null,
     val isTesting: Boolean = false,
     val status: MainStatus = MainStatus.Disconnected,
     val locateTarget: LocateTarget? = null,

@@ -572,4 +572,49 @@
     <string name="sub_info_open_page">فتح صفحة معلومات الاشتراك</string>
     <string name="sub_info_unlimited">غير محدود</string>
 
+    <!-- Bazhiko navigation, home and subscription tabs -->
+    <string name="tab_home">الرئيسية</string>
+    <string name="tab_servers">الخوادم</string>
+    <string name="tab_subscription">الاشتراك</string>
+    <string name="tab_more">الإعدادات</string>
+    <string name="home_status_disconnected">غير متصل</string>
+    <string name="home_status_connecting">جارٍ الاتصال…</string>
+    <string name="home_status_connected">الحماية مفعّلة</string>
+    <string name="home_title_disconnected">جاهز للاتصال</string>
+    <string name="home_title_connecting">جارٍ الاتصال</string>
+    <string name="home_title_connected">متصل</string>
+    <string name="home_hint_disconnected">المس الزر للاتصال</string>
+    <string name="home_hint_connecting">جارٍ إنشاء اتصال آمن…</string>
+    <string name="home_current_server">الخادم الحالي</string>
+    <string name="home_no_server">اختر خادمًا</string>
+    <string name="home_no_server_hint">أضف اشتراكًا لعرض الخوادم</string>
+    <string name="home_remaining_traffic">البيانات المتبقية</string>
+    <string name="home_traffic_of">%1$s من %2$s</string>
+    <string name="home_expired">منتهي الصلاحية</string>
+    <string name="home_ping">البينغ</string>
+    <string name="home_test_ping">اختبار البينغ</string>
+    <string name="home_paste_link">إضافة رابط من الحافظة</string>
+    <string name="sub_tab_title">اشتراكي</string>
+    <string name="sub_tab_empty_title">لا يوجد اشتراك بعد</string>
+    <string name="sub_tab_empty_hint">أضف رابط اشتراكك، أو احصل على تجربة مجانية من بوت تيليجرام.</string>
+    <string name="sub_tab_add">إضافة اشتراك</string>
+    <string name="sub_tab_used">المستخدم</string>
+    <string name="sub_tab_remaining">متبقٍ</string>
+    <string name="sub_tab_expires">ينتهي في</string>
+    <string name="sub_tab_renew">تجديد</string>
+    <string name="sub_tab_support">الدعم</string>
+    <string name="sub_tab_reseller_title">لوحة الموزعين، ربح حتى 150%</string>
+    <string name="sub_tab_reseller_action">اطلب عبر بوت تيليجرام</string>
+    <string name="more_title">الإعدادات</string>
+    <string name="more_telegram_channel">قناة تيليجرام</string>
+    <string name="more_support_bot">الدعم والشراء</string>
+    <plurals name="home_days_left">
+        <item quantity="zero">%d يوم</item>
+        <item quantity="one">يوم واحد</item>
+        <item quantity="two">يومان</item>
+        <item quantity="few">%d أيام</item>
+        <item quantity="many">%d يومًا</item>
+        <item quantity="other">%d يوم</item>
+    </plurals>
+
 </resources>

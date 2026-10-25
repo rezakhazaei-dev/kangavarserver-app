@@ -565,4 +565,45 @@
     <string name="sub_info_traffic" translatable="false">%1$s / %2$s</string>
     <string name="sub_info_unlimited">Unlimited</string>
 
+    <!-- Bazhiko navigation, home and subscription tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_servers">Servers</string>
+    <string name="tab_subscription">Subscription</string>
+    <string name="tab_more">Settings</string>
+    <string name="home_status_disconnected">Not connected</string>
+    <string name="home_status_connecting">Connecting…</string>
+    <string name="home_status_connected">Protection is on</string>
+    <string name="home_title_disconnected">Ready to connect</string>
+    <string name="home_title_connecting">Connecting</string>
+    <string name="home_title_connected">Connected</string>
+    <string name="home_hint_disconnected">Tap the button to connect</string>
+    <string name="home_hint_connecting">Setting up a secure connection…</string>
+    <string name="home_current_server">Current server</string>
+    <string name="home_no_server">Choose a server</string>
+    <string name="home_no_server_hint">Add a subscription to see servers</string>
+    <string name="home_remaining_traffic">Remaining traffic</string>
+    <string name="home_traffic_of">%1$s of %2$s</string>
+    <string name="home_expired">Expired</string>
+    <string name="home_ping">Ping</string>
+    <string name="home_test_ping">Test ping</string>
+    <string name="home_paste_link">Add link from clipboard</string>
+    <string name="sub_tab_title">My subscription</string>
+    <string name="sub_tab_empty_title">No subscription yet</string>
+    <string name="sub_tab_empty_hint">Add your subscription link, or get a free trial from our Telegram bot.</string>
+    <string name="sub_tab_add">Add subscription</string>
+    <string name="sub_tab_used">Used</string>
+    <string name="sub_tab_remaining">remaining</string>
+    <string name="sub_tab_expires">Expires</string>
+    <string name="sub_tab_renew">Renew</string>
+    <string name="sub_tab_support">Support</string>
+    <string name="sub_tab_reseller_title">Reseller panel, up to 150% profit</string>
+    <string name="sub_tab_reseller_action">Request via Telegram bot</string>
+    <string name="more_title">Settings</string>
+    <string name="more_telegram_channel">Telegram channel</string>
+    <string name="more_support_bot">Support and purchase</string>
+    <plurals name="home_days_left">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+
 </resources>

@@ -564,4 +564,45 @@
     <string name="sub_info_open_page">Abunəlik məlumat səhifəsini aç</string>
     <string name="sub_info_unlimited">Limitsiz</string>
 
+    <!-- Bazhiko navigation, home and subscription tabs -->
+    <string name="tab_home">Əsas</string>
+    <string name="tab_servers">Serverlər</string>
+    <string name="tab_subscription">Abunəlik</string>
+    <string name="tab_more">Ayarlar</string>
+    <string name="home_status_disconnected">Bağlantı yoxdur</string>
+    <string name="home_status_connecting">Qoşulur…</string>
+    <string name="home_status_connected">Qoruma aktivdir</string>
+    <string name="home_title_disconnected">Qoşulmağa hazırdır</string>
+    <string name="home_title_connecting">Qoşulur</string>
+    <string name="home_title_connected">Qoşulub</string>
+    <string name="home_hint_disconnected">Qoşulmaq üçün düyməyə toxunun</string>
+    <string name="home_hint_connecting">Təhlükəsiz bağlantı qurulur…</string>
+    <string name="home_current_server">Cari server</string>
+    <string name="home_no_server">Server seçin</string>
+    <string name="home_no_server_hint">Serverləri görmək üçün abunəlik əlavə edin</string>
+    <string name="home_remaining_traffic">Qalan trafik</string>
+    <string name="home_traffic_of">%1$s / %2$s</string>
+    <string name="home_expired">Müddəti bitib</string>
+    <string name="home_ping">Ping</string>
+    <string name="home_test_ping">Pingi yoxla</string>
+    <string name="home_paste_link">Mübadilə buferindən link əlavə et</string>
+    <string name="sub_tab_title">Abunəliyim</string>
+    <string name="sub_tab_empty_title">Hələ abunəlik yoxdur</string>
+    <string name="sub_tab_empty_hint">Abunəlik linkinizi əlavə edin və ya Telegram botumuzdan pulsuz sınaq alın.</string>
+    <string name="sub_tab_add">Abunəlik əlavə et</string>
+    <string name="sub_tab_used">İstifadə olunub</string>
+    <string name="sub_tab_remaining">qalıb</string>
+    <string name="sub_tab_expires">Bitmə tarixi</string>
+    <string name="sub_tab_renew">Yenilə</string>
+    <string name="sub_tab_support">Dəstək</string>
+    <string name="sub_tab_reseller_title">Diler paneli, 150%-ə qədər gəlir</string>
+    <string name="sub_tab_reseller_action">Telegram botu ilə müraciət et</string>
+    <string name="more_title">Ayarlar</string>
+    <string name="more_telegram_channel">Telegram kanalı</string>
+    <string name="more_support_bot">Dəstək və alış</string>
+    <plurals name="home_days_left">
+        <item quantity="one">%d gün</item>
+        <item quantity="other">%d gün</item>
+    </plurals>
+
 </resources>

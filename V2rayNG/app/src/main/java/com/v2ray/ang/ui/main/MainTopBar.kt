@@ -35,7 +35,6 @@ fun MainTopBar(
     onSearchQueryChange: (String) -> Unit,
     onSearchClose: () -> Unit,
     onSearchToggle: (Boolean) -> Unit,
-    onMenuClick: () -> Unit,
     onAction: (MainAction) -> Unit,
     onMoreMenuAction: (MainMoreMenuAction) -> Unit
 ) {
@@ -56,14 +55,11 @@ fun MainTopBar(
         onSearchQueryChange = onSearchQueryChange,
         onSearchClose = onSearchClose,
         searchPlaceholder = stringResource(R.string.menu_item_search),
+        // Top-level tab: no back arrow except to close the search field.
         navigationIcon = {
             if (showSearch) {
                 IconButton(onClick = onSearchClose) {
                     Icon(painterResource(R.drawable.ic_arrow_back_24dp), contentDescription = stringResource(R.string.acc_back))
-                }
-            } else {
-                IconButton(onClick = onMenuClick) {
-                    Icon(painterResource(R.drawable.ic_menu_24dp), contentDescription = stringResource(R.string.acc_open_menu))
                 }
             }
         },

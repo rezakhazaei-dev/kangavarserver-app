@@ -562,4 +562,44 @@
     <string name="sub_info_open_page">打开订阅信息页面</string>
     <string name="sub_info_unlimited">无限制</string>
 
+    <!-- Bazhiko navigation, home and subscription tabs -->
+    <string name="tab_home">首页</string>
+    <string name="tab_servers">服务器</string>
+    <string name="tab_subscription">订阅</string>
+    <string name="tab_more">设置</string>
+    <string name="home_status_disconnected">未连接</string>
+    <string name="home_status_connecting">正在连接…</string>
+    <string name="home_status_connected">保护已开启</string>
+    <string name="home_title_disconnected">准备连接</string>
+    <string name="home_title_connecting">正在连接</string>
+    <string name="home_title_connected">已连接</string>
+    <string name="home_hint_disconnected">点击按钮即可连接</string>
+    <string name="home_hint_connecting">正在建立安全连接…</string>
+    <string name="home_current_server">当前服务器</string>
+    <string name="home_no_server">选择服务器</string>
+    <string name="home_no_server_hint">添加订阅以查看服务器</string>
+    <string name="home_remaining_traffic">剩余流量</string>
+    <string name="home_traffic_of">%1$s / %2$s</string>
+    <string name="home_expired">已过期</string>
+    <string name="home_ping">延迟</string>
+    <string name="home_test_ping">测试延迟</string>
+    <string name="home_paste_link">从剪贴板添加链接</string>
+    <string name="sub_tab_title">我的订阅</string>
+    <string name="sub_tab_empty_title">暂无订阅</string>
+    <string name="sub_tab_empty_hint">添加订阅链接，或通过 Telegram 机器人获取免费试用。</string>
+    <string name="sub_tab_add">添加订阅</string>
+    <string name="sub_tab_used">已用</string>
+    <string name="sub_tab_remaining">剩余</string>
+    <string name="sub_tab_expires">到期</string>
+    <string name="sub_tab_renew">续费</string>
+    <string name="sub_tab_support">支持</string>
+    <string name="sub_tab_reseller_title">代理面板，利润高达 150%</string>
+    <string name="sub_tab_reseller_action">通过 Telegram 机器人申请</string>
+    <string name="more_title">设置</string>
+    <string name="more_telegram_channel">Telegram 频道</string>
+    <string name="more_support_bot">支持与购买</string>
+    <plurals name="home_days_left">
+        <item quantity="other">%d 天</item>
+    </plurals>
+
 </resources>

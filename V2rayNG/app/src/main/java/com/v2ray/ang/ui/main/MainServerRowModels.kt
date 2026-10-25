@@ -38,7 +38,7 @@ internal fun buildServerRowUiModel(
     )
 }
 
-private fun serverProtocolDescription(profile: ProfileItem): String {
+internal fun serverProtocolDescription(profile: ProfileItem): String {
     if (profile.configType.isComplexType()) return profile.configType.name
     val parts = mutableListOf(profile.configType.name)
     profile.network?.let { network ->

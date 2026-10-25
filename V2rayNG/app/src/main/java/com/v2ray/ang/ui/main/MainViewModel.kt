@@ -132,7 +132,7 @@ class MainViewModel(
             MainServiceEvent.StateNotRunning -> updateRunningState(false, clearTestingText = false)
             MainServiceEvent.StateStartSuccess -> {
                 toastSuccess(R.string.toast_services_success)
-                updateRunningState(true)
+                updateRunningState(true, startedNow = true)
             }
 
             is MainServiceEvent.StateStartFailure -> {
@@ -321,6 +321,7 @@ class MainViewModel(
 
     // ---------- Initialization ----------
     fun initialize() {
+        loadSelectedServer()
         viewModelScope.launch(preloadDispatcher) {
             try {
                 initialPageReady.await()
@@ -779,10 +780,41 @@ class MainViewModel(
     fun updateSelectedGuid(guid: String) {
         dataSource.setSelectServer(guid)
         _uiState.update { it.copy(selectedGuid = guid) }
+        loadSelectedServer()
     }
 
     fun refreshSelectedGuid() {
         _uiState.update { it.copy(selectedGuid = dataSource.getSelectServer()) }
+        loadSelectedServer()
+    }
+
+    /** Called by the activity once it has asked the service to start. */
+    fun markConnecting() {
+        if (uiState.value.isRunning) return
+        _uiState.update { it.copy(isConnecting = true) }
+        connectingTimeoutJob?.cancel()
+        connectingTimeoutJob = viewModelScope.launch {
+            // The service normally answers within seconds; never leave the spinner running forever.
+            delay(CONNECTING_TIMEOUT_MS)
+            _uiState.update { it.copy(isConnecting = false) }
+        }
+    }
+
+    private var connectingTimeoutJob: Job? = null
+
+    private var selectedServerJob: Job? = null
+
+    /** Resolves the selected server's profile again by GUID for the home tab. */
+    private fun loadSelectedServer() {
+        selectedServerJob?.cancel()
+        selectedServerJob = viewModelScope.launch(ioDispatcher) {
+            val guid = uiState.value.selectedGuid
+            val model = guid?.takeIf { it.isNotEmpty() }
+                ?.let { dataSource.decodeServerConfig(it) }
+                ?.let { buildSelectedServerUiModel(guid, it) }
+            ensureActive()
+            _uiState.update { state -> if (state.selectedGuid == guid) state.copy(selectedServer = model) else state }
+        }
     }
 
     fun removeServerAndRefresh(guid: String) {
@@ -929,11 +961,18 @@ class MainViewModel(
     }
 
     // ---------- Running state ----------
-    private fun updateRunningState(running: Boolean, clearTestingText: Boolean = true) {
+    private fun updateRunningState(running: Boolean, clearTestingText: Boolean = true, startedNow: Boolean = false) {
         if (!running || clearTestingText) testRequests.invalidateCurrent()
+        connectingTimeoutJob?.cancel()
         _uiState.update { state ->
             state.copy(
                 isRunning = running,
+                isConnecting = false,
+                connectedSinceMillis = when {
+                    !running -> null
+                    startedNow -> System.currentTimeMillis()
+                    else -> state.connectedSinceMillis
+                },
                 isTesting = testRequests.isTesting,
                 status = if (!clearTestingText && state.isRunning == running) state.status
                 else if (running) MainStatus.Connected else MainStatus.Disconnected
@@ -942,6 +981,8 @@ class MainViewModel(
     }
 
     override fun onCleared() {
+        selectedServerJob?.cancel()
+        connectingTimeoutJob?.cancel()
         setupGroupJob?.cancel()
         preloadJob?.cancel()
         selectedGroupLoadJob?.cancel()
@@ -965,5 +1006,6 @@ class MainViewModel(
 
     private companion object {
         const val TEST_RESULT_FLUSH_INTERVAL_MS = 500L
+        const val CONNECTING_TIMEOUT_MS = 20_000L
     }
 }

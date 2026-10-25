@@ -564,4 +564,45 @@
     <string name="sub_info_open_page">واز کردن صفحه اطلاعات اشتراک</string>
     <string name="sub_info_unlimited">بی‌حد</string>
 
+    <!-- Bazhiko navigation, home and subscription tabs -->
+    <string name="tab_home">خانه</string>
+    <string name="tab_servers">سرورها</string>
+    <string name="tab_subscription">اشتراک</string>
+    <string name="tab_more">تنظیمات</string>
+    <string name="home_status_disconnected">اتصال برقرار نیست</string>
+    <string name="home_status_connecting">در حال اتصال…</string>
+    <string name="home_status_connected">محافظت فعال است</string>
+    <string name="home_title_disconnected">آماده‌ی اتصال</string>
+    <string name="home_title_connecting">در حال اتصال</string>
+    <string name="home_title_connected">متصل</string>
+    <string name="home_hint_disconnected">برای اتصال دکمه را لمس کنید</string>
+    <string name="home_hint_connecting">در حال برقراری اتصال امن…</string>
+    <string name="home_current_server">سرور فعلی</string>
+    <string name="home_no_server">یک سرور انتخاب کنید</string>
+    <string name="home_no_server_hint">برای دیدن سرورها یک اشتراک اضافه کنید</string>
+    <string name="home_remaining_traffic">حجم باقی‌مانده</string>
+    <string name="home_traffic_of">%1$s از %2$s</string>
+    <string name="home_expired">منقضی شده</string>
+    <string name="home_ping">پینگ</string>
+    <string name="home_test_ping">تست پینگ</string>
+    <string name="home_paste_link">افزودن لینک از کلیپ‌بورد</string>
+    <string name="sub_tab_title">اشتراک من</string>
+    <string name="sub_tab_empty_title">هنوز اشتراکی ندارید</string>
+    <string name="sub_tab_empty_hint">لینک اشتراکت را اضافه کن یا از ربات تلگرام تست رایگان بگیر.</string>
+    <string name="sub_tab_add">افزودن اشتراک</string>
+    <string name="sub_tab_used">مصرف‌شده</string>
+    <string name="sub_tab_remaining">باقی‌مانده</string>
+    <string name="sub_tab_expires">انقضا</string>
+    <string name="sub_tab_renew">تمدید اشتراک</string>
+    <string name="sub_tab_support">پشتیبانی</string>
+    <string name="sub_tab_reseller_title">پنل نمایندگی تا ۱۵۰ درصد سود</string>
+    <string name="sub_tab_reseller_action">درخواست از ربات تلگرام</string>
+    <string name="more_title">تنظیمات</string>
+    <string name="more_telegram_channel">کانال تلگرام</string>
+    <string name="more_support_bot">پشتیبانی و خرید</string>
+    <plurals name="home_days_left">
+        <item quantity="one">%d روز</item>
+        <item quantity="other">%d روز</item>
+    </plurals>
+
 </resources>

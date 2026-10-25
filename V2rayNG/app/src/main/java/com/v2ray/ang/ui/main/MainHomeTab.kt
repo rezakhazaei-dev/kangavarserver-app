@@ -1,23 +1,25 @@
 package com.v2ray.ang.ui.main
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,17 +28,14 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,353 +46,261 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.GroupMapItem
-import com.v2ray.ang.extension.toTrafficString
-import com.v2ray.ang.ui.compose.BrandLatinFont
-import com.v2ray.ang.ui.compose.BrandPersianFont
-import com.v2ray.ang.ui.compose.LocalDarkTheme
 import kotlinx.coroutines.delay
 import java.util.Locale
 
 private const val TIMER_TICK_MS = 1000L
-private const val LOW_REMAINING_FRACTION = 0.1f
 
-/** Home tab: connection hero (status, power button, timer), current server and remaining traffic. */
+/** Number formatting with the digits of the app language (Persian digits in Persian). */
+internal class BzNumbers(val locale: Locale) {
+    fun int(value: Long): String = String.format(locale, "%d", value)
+    fun dec(value: Double, digits: Int = 1): String = formatDecimal(value, locale, digits)
+}
+
+@Composable
+internal fun rememberBzNumbers(): BzNumbers {
+    val configuration = LocalConfiguration.current
+    val locale = ConfigurationCompat.getLocales(configuration)[0] ?: Locale.getDefault()
+    return remember(locale) { BzNumbers(locale) }
+}
+
+internal val TopInsets: WindowInsets
+    @Composable get() = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+
+/** Home tab: welcome, connection, error or expired screen, chosen by [homeScreenMode]. */
 @Composable
 internal fun MainHomeTab(
     uiState: MainUiState,
-    statusText: String,
+    catalog: ServerCatalogUiModel,
+    liveTraffic: LiveTrafficUiModel,
     layout: MainLayoutInfo,
     onAction: (MainAction) -> Unit,
     onSelectTab: (MainTab) -> Unit,
+    onOpenAddSheet: () -> Unit,
 ) {
-    val phase = homeConnectionPhase(uiState.isRunning, uiState.isConnecting)
     val subscription = remember(uiState.groups, uiState.selectedServer) {
-        subscriptionForHome(uiState.groups, uiState.selectedServer)
+        subscriptionForHome(uiState.groups, uiState.selectedServer?.subscriptionId)
     }
-    val scrollState = rememberScrollState()
+    val now = remember(subscription) { System.currentTimeMillis() }
+    val summary = remember(subscription, now) { subscription?.usageInfo?.let { buildSubscriptionSummary(it, now) } }
+    val mode = homeScreenMode(
+        catalogLoaded = catalog.loaded,
+        hasServers = catalog.rows.isNotEmpty(),
+        isRunning = uiState.isRunning,
+        isConnecting = uiState.isConnecting,
+        hasConnectionError = uiState.connectionError != null,
+        subscriptionBlocked = summary?.isBlocked() == true,
+    )
+    val openBot = { onAction(MainAction.OpenSubscriptionLink(AppConfig.BRAND_TELEGRAM_BOT_URL)) }
+    when (mode) {
+        HomeScreenMode.Welcome -> WelcomeScreen(layout, onAction, onOpenAddSheet, openBot)
+        HomeScreenMode.Error -> ErrorScreen(uiState.connectionError, layout, onAction, onOpenAddSheet, openBot)
+        HomeScreenMode.Expired -> ExpiredScreen(subscription, summary, layout, onAction, onOpenAddSheet, openBot)
+        HomeScreenMode.Main -> HomeMain(uiState, catalog, liveTraffic, summary, layout, onAction, onSelectTab, onOpenAddSheet, openBot)
+    }
+}
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(homeBackground(phase))
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-    ) {
+/** Top bar of the home screens: wordmark, add-subscription and support buttons. */
+@Composable
+private fun HomeTopBar(layout: MainLayoutInfo, onOpenAddSheet: () -> Unit, openBot: () -> Unit) {
+    BzTopBar(
+        height = if (layout.shortHeight) 44.dp else 52.dp,
+        start = { BzWordmark(small = layout.small) },
+        actions = {
+            BzIconButton(R.drawable.ic_ms_add_link, stringResource(R.string.bz_add_subscription), onOpenAddSheet, small = layout.small)
+            BzIconButton(R.drawable.ic_ms_support_agent, stringResource(R.string.bz_support), openBot, small = layout.small)
+        },
+    )
+}
+
+/**
+ * Scrollable screen column whose content is at least one screen tall, so [Arrangement.SpaceBetween]
+ * can push the bottom block down while short screens still scroll.
+ */
+@Composable
+private fun FullHeightScroll(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val viewport = maxHeight
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .verticalScroll(rememberScrollState())
         ) {
-            HomeHeader(isRunning = uiState.isRunning, onAction = onAction)
-            if (layout.twoColumns) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = viewport),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                content = content,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeMain(
+    uiState: MainUiState,
+    catalog: ServerCatalogUiModel,
+    liveTraffic: LiveTrafficUiModel,
+    summary: SubscriptionSummaryUiModel?,
+    layout: MainLayoutInfo,
+    onAction: (MainAction) -> Unit,
+    onSelectTab: (MainTab) -> Unit,
+    onOpenAddSheet: () -> Unit,
+    openBot: () -> Unit,
+) {
+    val phase = homeConnectionPhase(uiState.isRunning, uiState.isConnecting)
+    val backdrop = if (phase == HomeConnectionPhase.Connected) BzBackdrop.Connected else BzBackdrop.Default
+    Box(
+        Modifier
+            .fillMaxSize()
+            .bzBackdrop(backdrop)
+            .windowInsetsPadding(TopInsets)
+            .padding(horizontal = if (layout.useRail) 28.dp else if (layout.small) 14.dp else 18.dp),
+    ) {
+        if (layout.twoColumns) {
+            Column(Modifier.fillMaxSize()) {
+                HomeTopBar(layout, onOpenAddSheet, openBot)
                 Row(
                     Modifier
-                        .widthIn(max = 1040.dp)
+                        .weight(1f)
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (layout.shortHeight) 20.dp else 32.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        ConnectionHero(phase, uiState, statusText, buttonSize = 176.dp, onAction = onAction)
+                    Column(Modifier.weight(1.1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        HeroBlock(phase, uiState, catalog, liveTraffic, layout, onAction)
                     }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        HomeCards(uiState, subscription, onSelectTab)
-                    }
-                }
-            } else {
-                Column(
-                    Modifier.widthIn(max = 560.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    ConnectionHero(
-                        phase,
-                        uiState,
-                        statusText,
-                        buttonSize = if (layout.small) 148.dp else 176.dp,
-                        onAction = onAction,
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        HomeCards(uiState, subscription, onSelectTab)
+                    Column(Modifier.weight(1f)) {
+                        CardsBlock(phase, uiState, catalog, liveTraffic, summary, layout, onSelectTab, wide = true)
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
-        }
-    }
-}
-
-/** Subscription of the selected server, or the first subscription that reports usage. */
-private fun subscriptionForHome(groups: List<GroupMapItem>, server: SelectedServerUiModel?): GroupMapItem? =
-    groups.firstOrNull { it.usageInfo != null && it.id == server?.subscriptionId }
-        ?: groups.firstOrNull { it.usageInfo != null }
-
-@Composable
-private fun homeBackground(phase: HomeConnectionPhase): Brush {
-    val base = MaterialTheme.colorScheme.background
-    val glow by animateColorAsState(
-        targetValue = if (phase == HomeConnectionPhase.Connected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
         } else {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-        },
-        label = "homeGlow",
-    )
-    return Brush.verticalGradient(listOf(glow, base, base))
-}
-
-@Composable
-private fun HomeHeader(isRunning: Boolean, onAction: (MainAction) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BrandName(Modifier.weight(1f))
-        IconButton(onClick = { onAction(MainAction.TestCurrentServer) }, enabled = isRunning) {
-            Icon(painterResource(R.drawable.ic_speed_24dp), contentDescription = stringResource(R.string.home_test_ping))
-        }
-        IconButton(onClick = { onAction(MainAction.ImportClipboard) }) {
-            Icon(painterResource(R.drawable.ic_content_paste_24dp), contentDescription = stringResource(R.string.home_paste_link))
+            FullHeightScroll {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    HomeTopBar(layout, onOpenAddSheet, openBot)
+                    HeroBlock(phase, uiState, catalog, liveTraffic, layout, onAction)
+                }
+                Column(Modifier.padding(top = 8.dp)) {
+                    CardsBlock(phase, uiState, catalog, liveTraffic, summary, layout, onSelectTab, wide = false)
+                }
+            }
         }
     }
 }
 
-/** Logo mark plus the brand name: Vazirmatn for «باژیکو», Outfit for the Latin BAZHIKO. */
+/** State pill, power button, big state text and the phase-specific block under it. */
 @Composable
-internal fun BrandName(modifier: Modifier = Modifier) {
-    val name = stringResource(R.string.app_name)
-    val persian = isArabicScript(name)
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Image(
-            painter = painterResource(if (LocalDarkTheme.current) R.drawable.brand_mark_dark else R.drawable.brand_mark_light),
-            contentDescription = null,
-            modifier = Modifier.size(30.dp),
-        )
-        Spacer(Modifier.size(8.dp))
-        Text(
-            text = name,
-            fontFamily = if (persian) BrandPersianFont else BrandLatinFont,
-            fontWeight = if (persian) FontWeight.Black else FontWeight.Bold,
-            fontSize = 21.sp,
-            letterSpacing = if (persian) 0.sp else 1.5.sp,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-    }
-}
-
-@Composable
-private fun ConnectionHero(
+private fun HeroBlock(
     phase: HomeConnectionPhase,
     uiState: MainUiState,
-    statusText: String,
-    buttonSize: Dp,
+    catalog: ServerCatalogUiModel,
+    liveTraffic: LiveTrafficUiModel,
+    layout: MainLayoutInfo,
     onAction: (MainAction) -> Unit,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        StatusPill(phase)
-        Spacer(Modifier.height(12.dp))
-        PowerButton(
-            phase = phase,
-            size = buttonSize,
-            onClick = { onAction(MainAction.ToggleService) },
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(
-                when (phase) {
-                    HomeConnectionPhase.Disconnected -> R.string.home_title_disconnected
-                    HomeConnectionPhase.Connecting -> R.string.home_title_connecting
-                    HomeConnectionPhase.Connected -> R.string.home_title_connected
-                }
-            ),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            color = if (phase == HomeConnectionPhase.Connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(4.dp))
+    val numbers = rememberBzNumbers()
+    if (!layout.shortHeight) {
+        Spacer(Modifier.height(if (layout.small) 2.dp else 6.dp))
         when (phase) {
-            HomeConnectionPhase.Connected -> {
-                uiState.connectedSinceMillis?.let { ConnectionTimer(it) }
-                Spacer(Modifier.height(10.dp))
-                PingPill(uiState.status, statusText) { onAction(MainAction.TestCurrentServer) }
-            }
+            HomeConnectionPhase.Connected -> BzStatePill(
+                stringResource(R.string.home_status_connected), Bz.Accent, Bz.Accent, Bz.Accent.copy(alpha = 0.35f),
+            )
 
-            HomeConnectionPhase.Connecting -> HintText(stringResource(R.string.home_hint_connecting))
-            HomeConnectionPhase.Disconnected -> HintText(stringResource(R.string.home_hint_disconnected))
+            HomeConnectionPhase.Connecting -> BzStatePill(
+                stringResource(R.string.bz_status_handshake), Bz.Warm, Bz.Muted, Bz.Line, blinking = true,
+            )
+
+            HomeConnectionPhase.Disconnected -> BzStatePill(
+                stringResource(R.string.home_status_disconnected), Bz.Faint, Bz.Muted, Bz.Line,
+            )
         }
     }
-}
-
-@Composable
-private fun HintText(text: String) {
+    val ringSize = when {
+        layout.shortHeight -> 150.dp
+        layout.small -> 160.dp
+        else -> 212.dp
+    }
+    PowerControl(
+        phase = phase,
+        ringSize = ringSize,
+        modifier = Modifier.padding(top = if (layout.small || layout.shortHeight) 6.dp else 22.dp),
+        onClick = { onAction(MainAction.ToggleService) },
+    )
     Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-    )
-}
-
-@Composable
-private fun StatusPill(phase: HomeConnectionPhase) {
-    val connected = phase == HomeConnectionPhase.Connected
-    val dotColor = when (phase) {
-        HomeConnectionPhase.Connected -> MaterialTheme.colorScheme.primary
-        HomeConnectionPhase.Connecting -> MaterialTheme.colorScheme.tertiary
-        HomeConnectionPhase.Disconnected -> MaterialTheme.colorScheme.outline
-    }
-    Surface(
-        shape = CircleShape,
-        color = if (connected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, if (connected) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(dotColor)
-            )
-            Spacer(Modifier.size(8.dp))
-            Text(
-                text = stringResource(
-                    when (phase) {
-                        HomeConnectionPhase.Disconnected -> R.string.home_status_disconnected
-                        HomeConnectionPhase.Connecting -> R.string.home_status_connecting
-                        HomeConnectionPhase.Connected -> R.string.home_status_connected
-                    }
-                ),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/** Big round connect button with a glow while connected and a spinning arc while connecting. */
-@Composable
-private fun PowerButton(phase: HomeConnectionPhase, size: Dp, onClick: () -> Unit) {
-    val primary = MaterialTheme.colorScheme.primary
-    val outline = MaterialTheme.colorScheme.outlineVariant
-    val transition = rememberInfiniteTransition(label = "power")
-    val pulse by transition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
-        label = "pulse",
-    )
-    val spin by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
-        label = "spin",
-    )
-    val connected = phase == HomeConnectionPhase.Connected
-    val label = stringResource(if (connected) R.string.acc_stop else R.string.acc_start)
-
-    Box(Modifier.size(size * 1.4f), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val center = Offset(this.size.width / 2, this.size.height / 2)
-            val radius = size.toPx() / 2
+        text = stringResource(
             when (phase) {
-                HomeConnectionPhase.Connected -> {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(primary.copy(alpha = 0.35f), Color.Transparent),
-                            center = center,
-                            radius = radius * 1.4f * pulse,
-                        ),
-                        radius = radius * 1.4f * pulse,
-                        center = center,
-                    )
-                    drawCircle(primary.copy(alpha = 0.4f), radius + 10.dp.toPx(), center, style = Stroke(2.dp.toPx()))
-                }
-
-                HomeConnectionPhase.Connecting -> {
-                    drawCircle(outline, radius + 10.dp.toPx(), center, style = Stroke(2.dp.toPx()))
-                    drawArc(
-                        color = primary,
-                        startAngle = spin,
-                        sweepAngle = 100f,
-                        useCenter = false,
-                        topLeft = Offset(center.x - radius - 10.dp.toPx(), center.y - radius - 10.dp.toPx()),
-                        size = androidx.compose.ui.geometry.Size((radius + 10.dp.toPx()) * 2, (radius + 10.dp.toPx()) * 2),
-                        style = Stroke(4.dp.toPx(), cap = StrokeCap.Round),
-                    )
-                }
-
-                HomeConnectionPhase.Disconnected -> drawCircle(
-                    color = outline,
-                    radius = radius + 14.dp.toPx(),
-                    center = center,
-                    style = Stroke(
-                        width = 2.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 7.dp.toPx())),
-                        cap = StrokeCap.Round,
-                    ),
-                )
+                HomeConnectionPhase.Connected -> R.string.home_title_connected
+                HomeConnectionPhase.Connecting -> R.string.bz_title_connecting
+                HomeConnectionPhase.Disconnected -> R.string.home_title_disconnected
             }
+        ),
+        style = bzText(
+            if (layout.shortHeight) 22.sp else if (layout.small) 25.sp else 32.sp,
+            FontWeight.Black,
+            if (phase == HomeConnectionPhase.Connected) Bz.Accent else Bz.Text,
+        ),
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(top = if (layout.small || layout.shortHeight) 6.dp else 14.dp),
+    )
+    Box(Modifier.heightIn(min = if (layout.shortHeight) 0.dp else 24.dp), contentAlignment = Alignment.Center) {
+        when (phase) {
+            HomeConnectionPhase.Connected -> uiState.connectedSinceMillis?.let { ConnectionTimer(it, numbers) }
+            HomeConnectionPhase.Connecting -> SubState(stringResource(R.string.bz_hint_wait), layout)
+            HomeConnectionPhase.Disconnected -> SubState(stringResource(R.string.home_hint_disconnected), layout)
         }
-        Surface(
-            onClick = onClick,
-            enabled = phase != HomeConnectionPhase.Connecting,
-            shape = CircleShape,
-            color = if (connected) primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, if (connected) primary else outline),
-            shadowElevation = if (connected) 12.dp else 4.dp,
-            modifier = Modifier
-                .size(size)
-                .semantics {
-                    contentDescription = label
-                    role = Role.Button
-                },
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_power_24dp),
-                    contentDescription = null,
-                    tint = if (connected) MaterialTheme.colorScheme.onPrimary else primary,
-                    modifier = Modifier.size(size * 0.36f),
-                )
-            }
-        }
+    }
+    when (phase) {
+        HomeConnectionPhase.Connecting -> ConnectingSteps(uiState.smartSelect)
+        HomeConnectionPhase.Disconnected -> if (!layout.shortHeight) QuickConnect(catalog, layout, numbers, onAction)
+        HomeConnectionPhase.Connected -> StatsRow(liveTraffic, uiState, numbers, layout)
     }
 }
 
 @Composable
-private fun ConnectionTimer(sinceMillis: Long) {
+private fun SubState(text: String, layout: MainLayoutInfo) {
+    Text(text, style = bzText(if (layout.small) 13.sp else 14.sp, color = Bz.Muted), textAlign = TextAlign.Center)
+}
+
+@Composable
+private fun ConnectionTimer(sinceMillis: Long, numbers: BzNumbers) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(sinceMillis) {
         while (true) {
@@ -401,172 +308,735 @@ private fun ConnectionTimer(sinceMillis: Long) {
             delay(TIMER_TICK_MS)
         }
     }
-    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.getDefault()
     Text(
-        text = formatConnectionDuration(now - sinceMillis, locale),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = formatConnectionDuration(now - sinceMillis, numbers.locale),
+        style = bzText(15.sp, FontWeight.Bold).copy(letterSpacing = 0.6.sp),
         textAlign = TextAlign.Center,
     )
 }
 
-/** Shows the last ping result; tapping runs a new test of the current server. */
+/**
+ * The 212dp power control: dashed ring when off, spinning arc while connecting, solid ring with a
+ * glowing mint button and two pulses when connected. Animations only change the draw phase.
+ */
 @Composable
-private fun PingPill(status: MainStatus, statusText: String, onClick: () -> Unit) {
-    val text = if (status == MainStatus.Connected) stringResource(R.string.home_test_ping) else statusText
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+private fun PowerControl(
+    phase: HomeConnectionPhase,
+    ringSize: Dp,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val scale = ringSize / 212.dp
+    val buttonSize = ringSize * (150f / 212f)
+    val transition = rememberInfiniteTransition(label = "power")
+    val spin = if (phase == HomeConnectionPhase.Connecting) {
+        transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "powerSpin")
+    } else {
+        null
+    }
+    val pulse = if (phase == HomeConnectionPhase.Connected) {
+        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "powerPulse")
+    } else {
+        null
+    }
+    val label = stringResource(if (phase == HomeConnectionPhase.Disconnected) R.string.bz_connect else R.string.bz_disconnect)
+    val state = stringResource(
+        when (phase) {
+            HomeConnectionPhase.Connected -> R.string.home_title_connected
+            HomeConnectionPhase.Connecting -> R.string.bz_title_connecting
+            HomeConnectionPhase.Disconnected -> R.string.home_status_disconnected
+        }
+    )
+    Box(
+        modifier
+            .size(ringSize)
+            .drawBehind {
+                val r = 96.dp.toPx() * scale
+                when (phase) {
+                    HomeConnectionPhase.Disconnected -> drawCircle(
+                        Color.White.copy(alpha = 0.09f),
+                        radius = r,
+                        style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 9.dp.toPx()))),
+                    )
+
+                    HomeConnectionPhase.Connecting -> {
+                        drawCircle(Color.White.copy(alpha = 0.07f), radius = r, style = Stroke(5.dp.toPx()))
+                        rotate(spin?.value ?: 0f) {
+                            drawArc(
+                                brush = Brush.linearGradient(listOf(Bz.Accent2, Bz.Accent)),
+                                startAngle = -90f,
+                                sweepAngle = 360f * 0.28f,
+                                useCenter = false,
+                                topLeft = Offset(center.x - r, center.y - r),
+                                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                                style = Stroke(5.dp.toPx(), cap = StrokeCap.Round),
+                            )
+                        }
+                    }
+
+                    HomeConnectionPhase.Connected -> {
+                        val buttonRadius = buttonSize.toPx() / 2f
+                        drawCircle(
+                            Brush.radialGradient(
+                                0f to Bz.Accent.copy(alpha = 0.38f),
+                                1f to Color.Transparent,
+                                center = center,
+                                radius = buttonRadius + 60.dp.toPx() * scale,
+                            ),
+                            radius = buttonRadius + 60.dp.toPx() * scale,
+                        )
+                        drawCircle(Bz.Accent.copy(alpha = 0.10f), radius = buttonRadius + 10.dp.toPx() * scale)
+                        drawCircle(Bz.Accent.copy(alpha = 0.55f), radius = r, style = Stroke(2.dp.toPx()))
+                        drawCircle(
+                            Bz.Accent.copy(alpha = 0.15f),
+                            radius = r + 8.dp.toPx() * scale,
+                            style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 7.dp.toPx()))),
+                        )
+                        val base = (ringSize.toPx() / 2f) - 30.dp.toPx() * scale
+                        val p = pulse?.value ?: 0f
+                        listOf(p, (p + 0.5f) % 1f).forEach { t ->
+                            drawCircle(
+                                Bz.Accent.copy(alpha = 0.35f * (0.7f * (1f - t)) / 0.7f * 0.7f),
+                                radius = base * (0.92f + 0.30f * t),
+                                style = Stroke(1.dp.toPx()),
+                            )
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        val on = phase == HomeConnectionPhase.Connected
+        Box(
+            Modifier
+                .size(buttonSize)
+                .clip(CircleShape)
+                .background(
+                    if (on) {
+                        Brush.radialGradient(listOf(Bz.Accent2, Bz.Accent), center = Offset.Unspecified)
+                    } else {
+                        Brush.radialGradient(listOf(Color(0xFF1E3A35), Color(0xFF10221F)))
+                    }
+                )
+                .border(1.dp, if (on) Color.Transparent else Bz.Line2, CircleShape)
+                .semantics {
+                    contentDescription = label
+                    stateDescription = state
+                }
+                .clickable(role = Role.Button, onClickLabel = label, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
-                painterResource(R.drawable.ic_speed_24dp),
+                painterResource(R.drawable.ic_ms_power_settings_new),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.size(8.dp))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface,
+                tint = if (on) Bz.On else Bz.Accent,
+                modifier = Modifier.size(buttonSize * (58f / 150f)),
             )
         }
     }
 }
 
 @Composable
-private fun HomeCards(
-    uiState: MainUiState,
-    subscription: GroupMapItem?,
-    onSelectTab: (MainTab) -> Unit,
-) {
-    ServerCard(uiState.selectedServer, onClick = { onSelectTab(MainTab.Servers) })
-    subscription?.usageInfo?.let { info ->
-        val summary = remember(info) { buildSubscriptionSummary(info, System.currentTimeMillis()) }
-        RemainingTrafficCard(summary, onClick = { onSelectTab(MainTab.Subscription) })
-    }
-}
-
-@Composable
-private fun HomeCard(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+private fun ConnectingSteps(smart: Boolean) {
+    Column(
+        Modifier
+            .padding(top = 14.dp)
+            .widthIn(min = 230.dp)
+            .glass()
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        content()
+        StepRow(stringResource(if (smart) R.string.bz_step_find else R.string.bz_step_prepare), StepState.Done)
+        StepRow(stringResource(R.string.bz_step_handshake), StepState.Running)
+        StepRow(stringResource(R.string.bz_step_tunnel), StepState.Pending)
+    }
+}
+
+private enum class StepState { Done, Running, Pending }
+
+@Composable
+private fun StepRow(text: String, state: StepState) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (state) {
+            StepState.Done -> Icon(painterResource(R.drawable.ic_ms_check_circle_fill), null, tint = Bz.Accent, modifier = Modifier.size(18.dp))
+            StepState.Running -> CircularProgressIndicator(Modifier.size(16.dp), color = Bz.Warm, strokeWidth = 2.dp)
+            StepState.Pending -> Icon(painterResource(R.drawable.ic_ms_radio_button_unchecked), null, tint = Bz.Faint, modifier = Modifier.size(18.dp))
+        }
+        Text(
+            text,
+            style = bzText(
+                13.sp,
+                if (state == StepState.Running) FontWeight.Bold else FontWeight.Normal,
+                when (state) {
+                    StepState.Done -> Bz.Muted
+                    StepState.Running -> Bz.Text
+                    StepState.Pending -> Bz.Faint
+                },
+            ),
+        )
+    }
+}
+
+/** "Or connect straight to a country" chips, one per known country, fastest first. */
+@Composable
+private fun QuickConnect(catalog: ServerCatalogUiModel, layout: MainLayoutInfo, numbers: BzNumbers, onAction: (MainAction) -> Unit) {
+    val countries = catalog.countries.filter { it.country != ServerCountry.Other }.take(3)
+    if (countries.isEmpty()) return
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = if (layout.small) 10.dp else 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (!layout.compactHeight) {
+            Text(stringResource(R.string.bz_quick_connect), style = bzText(12.sp, color = Bz.Faint))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            countries.forEach { group ->
+                val name = stringResource(group.country.labelRes)
+                val description = stringResource(R.string.bz_quick_connect_to, name)
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .height(if (layout.small) 38.dp else 42.dp)
+                        .glass(CircleShape)
+                        .clickable(role = Role.Button, onClickLabel = description) { onAction(MainAction.QuickConnect(group.country)) }
+                        .semantics { contentDescription = description }
+                        .padding(horizontal = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (layout.small) 4.dp else 7.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BzFlag(group.country, if (layout.small) 18.dp else 22.dp, ring = false)
+                    Text(name, style = bzText(if (layout.small) 12.sp else 13.sp, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (group.bestDelayMillis.isMeasuredDelay()) {
+                        Text(
+                            numbers.int(group.bestDelayMillis),
+                            style = bzText(11.sp, FontWeight.Bold, pingColor(pingQuality(group.bestDelayMillis))),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun ServerCard(server: SelectedServerUiModel?, onClick: () -> Unit) {
-    HomeCard(onClick) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun StatsRow(liveTraffic: LiveTrafficUiModel, uiState: MainUiState, numbers: BzNumbers, layout: MainLayoutInfo) {
+    val ping = uiState.currentServerTest?.delayMillis ?: 0L
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .padding(top = if (layout.shortHeight) 8.dp else 16.dp),
+    ) {
+        StatCell(numbers.dec(megabitsPerSecond(liveTraffic.downloadBytesPerSecond)), "Mb/s", stringResource(R.string.bz_download), layout)
+        StatDivider()
+        StatCell(numbers.dec(megabitsPerSecond(liveTraffic.uploadBytesPerSecond)), "Mb/s", stringResource(R.string.bz_upload), layout)
+        StatDivider()
+        StatCell(if (ping.isMeasuredDelay()) numbers.int(ping) else "—", "ms", stringResource(R.string.home_ping), layout)
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.StatCell(value: String, unit: String, label: String, layout: MainLayoutInfo) {
+    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            buildAnnotatedString {
+                append(value)
+                withStyle(SpanStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Bz.Muted)) { append(" $unit") }
+            },
+            style = bzText(if (layout.small || layout.shortHeight) 18.sp else 21.sp, FontWeight.Black),
+            maxLines = 1,
+        )
+        Text(label, style = bzText(12.sp, color = Bz.Muted))
+    }
+}
+
+@Composable
+private fun StatDivider() {
+    Box(
+        Modifier
+            .padding(vertical = 8.dp)
+            .width(1.dp)
+            .fillMaxHeight()
+            .background(Bz.Line)
+    )
+}
+
+/** Fixed-IP chip, server card, quota and (wide screens) the download sparkline. */
+@Composable
+private fun CardsBlock(
+    phase: HomeConnectionPhase,
+    uiState: MainUiState,
+    catalog: ServerCatalogUiModel,
+    liveTraffic: LiveTrafficUiModel,
+    summary: SubscriptionSummaryUiModel?,
+    layout: MainLayoutInfo,
+    onSelectTab: (MainTab) -> Unit,
+    wide: Boolean,
+) {
+    val numbers = rememberBzNumbers()
+    val ip = uiState.currentServerTest?.ipAddress?.takeIf { phase == HomeConnectionPhase.Connected && it.isNotBlank() }
+    if (ip != null) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.Center) {
+            Row(
+                Modifier
+                    .height(28.dp)
+                    .glass(CircleShape, fill = Bz.AccentDim, border = Bz.Accent.copy(alpha = 0.3f))
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(painterResource(R.drawable.ic_ms_verified), null, tint = Bz.Accent, modifier = Modifier.size(15.dp))
+                Text(stringResource(R.string.bz_fixed_ip, maskIpAddress(ip)), style = bzText(12.sp, FontWeight.SemiBold, Bz.Accent))
+            }
+        }
+    }
+    ServerCard(uiState, catalog, numbers, layout) { onSelectTab(MainTab.Servers) }
+    if (phase != HomeConnectionPhase.Connecting && summary != null) {
+        QuotaCard(summary, numbers, layout)
+    }
+    if (wide && phase == HomeConnectionPhase.Connected && layout.wideScreen) {
+        Sparkline(liveTraffic, numbers)
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun ServerCard(
+    uiState: MainUiState,
+    catalog: ServerCatalogUiModel,
+    numbers: BzNumbers,
+    layout: MainLayoutInfo,
+    onClick: () -> Unit,
+) {
+    val selectedRow = catalog.row(uiState.selectedGuid)
+    val connected = uiState.isRunning
+    val title: String
+    val subtitle: String
+    if (uiState.smartSelect) {
+        title = stringResource(R.string.bz_smart_select)
+        subtitle = if (connected && selectedRow != null) {
+            val ping = uiState.currentServerTest?.delayMillis?.takeIf { it.isMeasuredDelay() } ?: selectedRow.testDelayMillis
+            if (ping.isMeasuredDelay()) {
+                stringResource(R.string.bz_smart_connected_ping, selectedRow.displayName, numbers.int(ping))
+            } else {
+                stringResource(R.string.bz_smart_connected, selectedRow.displayName)
+            }
+        } else {
+            stringResource(R.string.bz_smart_hint)
+        }
+    } else {
+        title = selectedRow?.displayName ?: stringResource(R.string.home_no_server)
+        subtitle = selectedRow?.let { row ->
+            if (row.testDelayMillis.isMeasuredDelay()) {
+                stringResource(R.string.bz_protocol_ping, row.typeDescription, numbers.int(row.testDelayMillis))
+            } else {
+                row.typeDescription
+            }
+        } ?: stringResource(R.string.home_no_server_hint)
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .glass()
+            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.bz_choose_server), onClick = onClick)
+            .padding(horizontal = if (layout.small) 12.dp else 14.dp, vertical = if (layout.small || layout.shortHeight) 9.dp else 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (uiState.smartSelect) BzSmartIcon() else BzFlag(selectedRow?.country ?: ServerCountry.Other, 38.dp)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = bzText(15.sp, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = bzText(if (layout.small) 11.sp else 12.sp, color = Bz.Muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(painterResource(R.drawable.ic_ms_chevron_right), null, tint = Bz.Muted)
+    }
+}
+
+@Composable
+private fun QuotaCard(summary: SubscriptionSummaryUiModel, numbers: BzNumbers, layout: MainLayoutInfo) {
+    Column(
+        Modifier
+            .padding(top = if (layout.small || layout.shortHeight) 6.dp else 10.dp)
+            .fillMaxWidth()
+            .glass()
+            .padding(horizontal = if (layout.small) 12.dp else 16.dp, vertical = if (layout.small || layout.shortHeight) 8.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (layout.small) 6.dp else 8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.home_remaining_traffic), style = bzText(13.sp, color = Bz.Muted), modifier = Modifier.weight(1f))
+            Text(quotaText(summary, numbers), style = bzText(13.sp, color = Bz.Muted), maxLines = 1)
+        }
+        summary.remainingFraction?.let { fraction ->
             Box(
                 Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f))
             ) {
-                Icon(
-                    painterResource(R.drawable.ic_dns_24dp),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction)
+                        .fillMaxHeight()
+                        .clip(CircleShape)
+                        .background(Bz.AccentGradient)
                 )
             }
-            Spacer(Modifier.size(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.home_current_server),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = server?.remarks?.ifBlank { null } ?: stringResource(R.string.home_no_server),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = server?.typeDescription ?: stringResource(R.string.home_no_server_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Icon(
-                painterResource(R.drawable.ic_chevron_end_24dp),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
 
 @Composable
-private fun RemainingTrafficCard(summary: SubscriptionSummaryUiModel, onClick: () -> Unit) {
-    val low = summary.expired || (summary.remainingFraction != null && summary.remainingFraction < LOW_REMAINING_FRACTION)
-    val accent = if (low) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    HomeCard(onClick) {
-        Column(
+private fun quotaText(summary: SubscriptionSummaryUiModel, numbers: BzNumbers) = buildAnnotatedString {
+    val remaining = summary.remainingBytes
+    if (remaining != null) {
+        withStyle(SpanStyle(color = Bz.Text, fontWeight = FontWeight.Bold, fontSize = 14.sp)) {
+            append(numbers.dec(gigabytes(remaining)))
+        }
+        append(" ")
+        append(stringResource(R.string.bz_of_gb, numbers.dec(gigabytes(summary.totalBytes))))
+    } else {
+        withStyle(SpanStyle(color = Bz.Text, fontWeight = FontWeight.Bold, fontSize = 14.sp)) {
+            append(stringResource(R.string.sub_info_unlimited))
+        }
+    }
+    summary.daysLeft?.let { days ->
+        append(" · ")
+        append(pluralStringResource(R.plurals.bz_days, days, numbers.int(days.toLong())))
+    }
+}
+
+@Composable
+private fun Sparkline(liveTraffic: LiveTrafficUiModel, numbers: BzNumbers) {
+    Column(
+        Modifier
+            .padding(top = 12.dp)
+            .fillMaxWidth()
+            .glass()
+            .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 6.dp)
+    ) {
+        Row(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.bz_spark_title), style = bzText(12.sp, color = Bz.Muted), modifier = Modifier.weight(1f))
+            Text(
+                stringResource(R.string.bz_session_traffic, numbers.dec(megabytes(liveTraffic.sessionBytes), 0)),
+                style = bzText(13.sp, FontWeight.Bold),
+            )
+        }
+        val history = liveTraffic.downloadHistory
+        Box(
             Modifier
-                .padding(14.dp)
-                .semantics(mergeDescendants = true) {},
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.home_remaining_traffic),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                val daysText = when {
-                    summary.expired -> stringResource(R.string.home_expired)
-                    summary.daysLeft != null -> pluralStringResource(R.plurals.home_days_left, summary.daysLeft, summary.daysLeft)
-                    else -> null
+                .padding(top = 4.dp)
+                .fillMaxWidth()
+                .height(46.dp)
+                .drawBehind {
+                    if (history.size < 2) return@drawBehind
+                    val max = (history.maxOrNull() ?: 0L).coerceAtLeast(1L).toFloat()
+                    val step = size.width / (history.size - 1)
+                    val line = Path()
+                    history.forEachIndexed { index, value ->
+                        val x = index * step
+                        val y = size.height - (value / max) * (size.height - 6.dp.toPx()) - 2.dp.toPx()
+                        if (index == 0) line.moveTo(x, y) else line.lineTo(x, y)
+                    }
+                    val fill = Path().apply {
+                        addPath(line)
+                        lineTo(size.width, size.height)
+                        lineTo(0f, size.height)
+                        close()
+                    }
+                    drawPath(fill, Brush.verticalGradient(listOf(Bz.Accent.copy(alpha = 0.45f), Color.Transparent)))
+                    drawPath(line, Bz.Accent, style = Stroke(2.dp.toPx()))
                 }
-                daysText?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (summary.expired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** First-run screen shown while no server exists. */
+@Composable
+private fun WelcomeScreen(
+    layout: MainLayoutInfo,
+    onAction: (MainAction) -> Unit,
+    onOpenAddSheet: () -> Unit,
+    openBot: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .bzBackdrop(BzBackdrop.Default)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = if (layout.small) 14.dp else 18.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        FullHeightScroll(Modifier.widthIn(max = 460.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) { BzWordmark(small = layout.small) }
+                Spacer(Modifier.height(if (layout.small) 4.dp else 14.dp))
+                BzMark(if (layout.small) 150.dp else 200.dp)
+                Text(
+                    buildAnnotatedString {
+                        append(stringResource(R.string.bz_welcome_title_1))
+                        append(" ")
+                        withStyle(SpanStyle(color = Bz.Accent)) { append(stringResource(R.string.bz_welcome_title_2)) }
+                    },
+                    style = bzText(if (layout.small) 25.sp else 30.sp, FontWeight.Black),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
+                )
+                Text(
+                    stringResource(R.string.bz_welcome_body),
+                    style = bzText(if (layout.small) 13.sp else 14.sp, color = Bz.Muted),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 6.dp),
+                )
+                FeatureRow(layout)
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BzButton(
+                        stringResource(R.string.bz_paste_link),
+                        onOpenAddSheet,
+                        Modifier.fillMaxWidth(),
+                        iconRes = R.drawable.ic_ms_content_paste,
+                        height = if (layout.small) 48.dp else 52.dp,
+                    )
+                    BzButton(
+                        stringResource(R.string.bz_scan_qr),
+                        { onAction(MainAction.ImportQRcode) },
+                        Modifier.fillMaxWidth(),
+                        style = BzButtonStyle.Outlined,
+                        iconRes = R.drawable.ic_ms_qr_code_scanner,
+                        height = if (layout.small) 48.dp else 52.dp,
+                    )
+                    BzButton(
+                        stringResource(R.string.bz_free_trial_bot, BOT_HANDLE),
+                        openBot,
+                        Modifier.fillMaxWidth(),
+                        style = BzButtonStyle.Text,
+                        fontSize = 14.sp,
                     )
                 }
             }
-            Spacer(Modifier.height(4.dp))
             Text(
-                text = if (summary.remainingBytes != null) {
-                    stringResource(R.string.home_traffic_of, summary.remainingBytes.toTrafficString(), summary.totalBytes.toTrafficString())
-                } else {
-                    stringResource(R.string.sub_info_unlimited)
-                },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = accent,
+                stringResource(R.string.bz_ten_years),
+                style = bzText(12.sp, color = Bz.Faint),
+                modifier = Modifier.padding(top = 16.dp, bottom = 14.dp),
             )
-            summary.remainingFraction?.let { fraction ->
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(CircleShape)
-                        .clearAndSetSemantics {},
-                    color = accent,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    drawStopIndicator = {},
-                )
+        }
+    }
+}
+
+internal const val BOT_HANDLE = "@Kangavarserverbot"
+internal const val CHANNEL_HANDLE = "@Kangavarserver"
+
+@Composable
+private fun FeatureRow(layout: MainLayoutInfo) {
+    Row(
+        Modifier
+            .padding(top = if (layout.small) 12.dp else 16.dp, bottom = if (layout.small) 14.dp else 18.dp)
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .glass()
+            .padding(vertical = 12.dp),
+    ) {
+        listOf(
+            R.string.bz_feat_speed to R.string.bz_feat_speed_sub,
+            R.string.bz_feat_ip to R.string.bz_feat_ip_sub,
+            R.string.bz_feat_support to R.string.bz_feat_support_sub,
+        ).forEachIndexed { index, (title, sub) ->
+            if (index > 0) StatDivider()
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(title), style = bzText(if (layout.small) 13.sp else 15.sp, FontWeight.ExtraBold), textAlign = TextAlign.Center)
+                Text(stringResource(sub), style = bzText(12.sp, color = Bz.Muted), textAlign = TextAlign.Center)
             }
+        }
+    }
+}
+
+/** Shared frame of the error and expired screens: top bar, pill, toned mark, title and body. */
+@Composable
+private fun StatusScreen(
+    backdrop: BzBackdrop,
+    tone: BzMarkTone,
+    badgeRes: Int,
+    pillText: String,
+    title: String,
+    body: String,
+    layout: MainLayoutInfo,
+    onOpenAddSheet: () -> Unit,
+    openBot: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val color = if (tone == BzMarkTone.Error) Bz.Error else Bz.Warm
+    Box(
+        Modifier
+            .fillMaxSize()
+            .bzBackdrop(backdrop)
+            .windowInsetsPadding(TopInsets)
+            .padding(horizontal = if (layout.useRail) 28.dp else if (layout.small) 14.dp else 18.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(
+            Modifier
+                .widthIn(max = 460.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            HomeTopBar(layout, onOpenAddSheet, openBot)
+            Spacer(Modifier.height(10.dp))
+            BzStatePill(pillText, color, color, color.copy(alpha = 0.35f))
+            Spacer(Modifier.height(14.dp))
+            BzMark(if (layout.small) 140.dp else 168.dp, tone, badgeRes, animate = false)
+            Text(
+                title,
+                style = bzText(if (layout.small) 25.sp else 32.sp, FontWeight.Black, color),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 14.dp),
+            )
+            Text(
+                body,
+                style = bzText(if (layout.small) 13.sp else 14.sp, color = Bz.Muted),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            content()
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun ErrorScreen(
+    error: ConnectionErrorUiModel?,
+    layout: MainLayoutInfo,
+    onAction: (MainAction) -> Unit,
+    onOpenAddSheet: () -> Unit,
+    openBot: () -> Unit,
+) {
+    StatusScreen(
+        backdrop = BzBackdrop.Error,
+        tone = BzMarkTone.Error,
+        badgeRes = R.drawable.ic_ms_priority_high,
+        pillText = stringResource(R.string.bz_error_pill),
+        title = stringResource(R.string.bz_error_title),
+        body = error?.serverName?.let { stringResource(R.string.bz_error_body_server, it) } ?: stringResource(R.string.bz_error_body),
+        layout = layout,
+        onOpenAddSheet = onOpenAddSheet,
+        openBot = openBot,
+    ) {
+        Row(
+            Modifier
+                .padding(top = if (layout.small) 12.dp else 16.dp, bottom = if (layout.small) 12.dp else 14.dp)
+                .fillMaxWidth()
+                .glass(Bz.BoxShape, fill = Bz.WarmDim, border = Bz.Warm.copy(alpha = 0.25f))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(painterResource(R.drawable.ic_ms_tips_and_updates_fill), null, tint = Bz.Warm, modifier = Modifier.size(20.dp))
+            Text(stringResource(R.string.bz_error_tip), style = bzText(12.5.sp), modifier = Modifier.weight(1f))
+        }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            BzButton(
+                stringResource(R.string.bz_retry_other),
+                { onAction(MainAction.RetryOtherServer) },
+                Modifier.fillMaxWidth(),
+                iconRes = R.drawable.ic_ms_auto_awesome_fill,
+                height = if (layout.small) 48.dp else 52.dp,
+            )
+            BzButton(
+                stringResource(R.string.bz_send_report),
+                openBot,
+                Modifier.fillMaxWidth(),
+                style = BzButtonStyle.Outlined,
+                iconRes = R.drawable.ic_ms_send,
+                height = if (layout.small) 48.dp else 52.dp,
+            )
+            BzButton(
+                stringResource(R.string.bz_back_home),
+                { onAction(MainAction.DismissConnectionError) },
+                Modifier.fillMaxWidth(),
+                style = BzButtonStyle.Text,
+                textColor = Bz.Muted,
+                fontSize = 14.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExpiredScreen(
+    subscription: GroupMapItem?,
+    summary: SubscriptionSummaryUiModel?,
+    layout: MainLayoutInfo,
+    onAction: (MainAction) -> Unit,
+    onOpenAddSheet: () -> Unit,
+    openBot: () -> Unit,
+) {
+    val numbers = rememberBzNumbers()
+    val renewLink = subscription?.usageInfo?.webPageUrl ?: subscription?.usageInfo?.supportUrl
+    StatusScreen(
+        backdrop = BzBackdrop.Warm,
+        tone = BzMarkTone.Warm,
+        badgeRes = R.drawable.ic_ms_hourglass_bottom_fill,
+        pillText = stringResource(R.string.bz_expired_pill),
+        title = stringResource(R.string.bz_expired_title),
+        body = stringResource(if (summary?.expired == true) R.string.bz_expired_body_time else R.string.bz_expired_body_traffic),
+        layout = layout,
+        onOpenAddSheet = onOpenAddSheet,
+        openBot = openBot,
+    ) {
+        if (summary != null && summary.totalBytes > 0L) {
+            Row(
+                Modifier
+                    .padding(top = 16.dp, bottom = 14.dp)
+                    .fillMaxWidth()
+                    .glass()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                BzRowIcon(R.drawable.ic_ms_data_usage)
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.bz_period_usage), style = bzText(14.sp, FontWeight.Bold))
+                    Text(
+                        stringResource(
+                            R.string.bz_usage_of,
+                            numbers.dec(gigabytes(summary.usedBytes)),
+                            numbers.dec(gigabytes(summary.totalBytes)),
+                        ),
+                        style = bzText(12.sp, color = Bz.Muted),
+                    )
+                }
+            }
+        } else {
+            Spacer(Modifier.height(16.dp))
+        }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            BzButton(
+                stringResource(R.string.bz_renew_same),
+                { onAction(MainAction.OpenSubscriptionLink(renewLink ?: AppConfig.BRAND_TELEGRAM_BOT_URL)) },
+                Modifier.fillMaxWidth(),
+                iconRes = R.drawable.ic_ms_bolt,
+                height = if (layout.small) 48.dp else 52.dp,
+            )
+            BzButton(
+                stringResource(R.string.bz_buy_from_bot, BOT_HANDLE),
+                openBot,
+                Modifier.fillMaxWidth(),
+                style = BzButtonStyle.Outlined,
+                iconRes = R.drawable.ic_ms_send,
+                height = if (layout.small) 48.dp else 52.dp,
+            )
+            BzButton(
+                stringResource(R.string.bz_refresh_subscription),
+                { onAction(MainAction.UpdateSubscriptions) },
+                Modifier.fillMaxWidth(),
+                style = BzButtonStyle.Text,
+                textColor = Bz.Muted,
+                fontSize = 14.sp,
+            )
         }
     }
 }

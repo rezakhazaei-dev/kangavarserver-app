@@ -6,6 +6,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -118,6 +119,9 @@ private val Vazirmatn = FontFamily(
     Font(R.font.vazirmatn_extrabold, FontWeight.ExtraBold),
     Font(R.font.vazirmatn_black, FontWeight.Black),
 )
+
+/** The Aurora Mint dark scheme; the main screen always uses it because the brand design is dark-only. */
+val BrandDarkColorScheme: ColorScheme get() = DarkColor
 
 /** Brand wordmark faces: Outfit Bold for the Latin "BAZHIKO", Vazirmatn Black for «باژیکو». */
 val BrandLatinFont = FontFamily(Font(R.font.outfit_bold, FontWeight.Bold))

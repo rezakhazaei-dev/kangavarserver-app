@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -82,10 +83,22 @@ class MainViewModel(
             selectedGroupId = dataSource.getSelectedSubscriptionId(),
             selectedGuid = dataSource.getSelectServer(),
             confirmRemove = dataSource.getConfirmRemove(),
-            doubleColumnDisplay = dataSource.getDoubleColumnDisplay()
+            doubleColumnDisplay = dataSource.getDoubleColumnDisplay(),
+            smartSelect = dataSource.getSmartSelect(),
         )
     )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    private val _liveTraffic = MutableStateFlow(LiveTrafficUiModel())
+
+    /** Download and upload rates of the running connection; idle while disconnected. */
+    val liveTraffic: StateFlow<LiveTrafficUiModel> = _liveTraffic.asStateFlow()
+    private var liveTrafficJob: Job? = null
+    private var currentServerTestJob: Job? = null
+
+    /** Set once the first automatic ping of the server list ran in this session. */
+    @Volatile
+    private var autoPingDone = false
 
     // ---------- Keyword filtering ----------
     @Volatile
@@ -131,23 +144,29 @@ class MainViewModel(
             MainServiceEvent.StateRunning -> updateRunningState(true, clearTestingText = false)
             MainServiceEvent.StateNotRunning -> updateRunningState(false, clearTestingText = false)
             MainServiceEvent.StateStartSuccess -> {
-                toastSuccess(R.string.toast_services_success)
+                _uiState.update { it.copy(connectionError = null) }
                 updateRunningState(true, startedNow = true)
+                scheduleCurrentServerTest()
             }
 
             is MainServiceEvent.StateStartFailure -> {
                 if (!event.message.isNullOrBlank()) {
-                    toastError(event.message)
-                } else {
-                    toastError(R.string.toast_services_failure)
+                    LogUtil.w(AppConfig.TAG, "Service start failed: ${event.message}")
                 }
                 updateRunningState(false)
+                showConnectionError()
             }
 
             MainServiceEvent.StateStopSuccess -> updateRunningState(false)
             is MainServiceEvent.MeasureDelayResult -> {
                 if (!uiState.value.isRunning || !testRequests.completeCurrent(event.requestId)) return
-                _uiState.update { it.copy(isTesting = testRequests.isTesting, status = MainStatus.ConnectionTest(event.result)) }
+                _uiState.update {
+                    it.copy(
+                        isTesting = testRequests.isTesting,
+                        status = MainStatus.ConnectionTest(event.result),
+                        currentServerTest = event.result,
+                    )
+                }
             }
 
             is MainServiceEvent.MeasureConfigSuccess -> {
@@ -266,6 +285,14 @@ class MainViewModel(
     internal fun serverGroupState(groupId: String): StateFlow<ServerGroupUiState> =
         mutableServerGroupState(groupId).asStateFlow()
 
+    /** Every server grouped by country; the servers and home tabs both read it. */
+    internal val serverCatalog: StateFlow<ServerCatalogUiModel> by lazy {
+        mutableServerGroupState(ALL_GROUP_ID)
+            .map { state -> if (state.loaded) buildServerCatalog(state.rows) else ServerCatalogUiModel() }
+            .flowOn(defaultDispatcher)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, ServerCatalogUiModel())
+    }
+
     private fun mutableServerGroupState(groupId: String): MutableStateFlow<ServerGroupUiState> =
         groupUiFlows.computeIfAbsent(groupId) { MutableStateFlow(ServerGroupUiState()) }
 
@@ -293,6 +320,7 @@ class MainViewModel(
             is MainAction.Search -> filterConfig(action.query)
             is MainAction.ImportBatchConfig -> importBatchConfig(action.configText)
             MainAction.LocateHandled -> consumeLocateTarget()
+            MainAction.DismissConnectionError -> _uiState.update { it.copy(connectionError = null) }
             is MainAction.ShareQRCode -> {
                 val bitmap = dataSource.share2QRCode(action.guid)
                 _uiState.update { it.copy(shareQRCodeBitmap = bitmap) }
@@ -313,7 +341,11 @@ class MainViewModel(
             is MainAction.EditServer,
             is MainAction.ShareClipboard,
             is MainAction.ShareFullContent,
-            is MainAction.OpenSubscriptionLink -> {
+            is MainAction.OpenSubscriptionLink,
+            is MainAction.QuickConnect,
+            MainAction.SelectSmart,
+            MainAction.RetryOtherServer,
+            is MainAction.ChangeQuickSetting -> {
                 // Handled by Activity via its onAction lambda
             }
         }
@@ -322,6 +354,7 @@ class MainViewModel(
     // ---------- Initialization ----------
     fun initialize() {
         loadSelectedServer()
+        refreshQuickSettings()
         viewModelScope.launch(preloadDispatcher) {
             try {
                 initialPageReady.await()
@@ -343,6 +376,33 @@ class MainViewModel(
                 doubleColumnDisplay = dataSource.getDoubleColumnDisplay()
             )
         }
+        refreshQuickSettings()
+    }
+
+    private var quickSettingsJob: Job? = null
+
+    /** Reads the quick settings again, e.g. after an advanced settings screen closed. */
+    fun refreshQuickSettings() {
+        quickSettingsJob?.cancel()
+        quickSettingsJob = viewModelScope.launch(ioDispatcher) {
+            val settings = dataSource.readQuickSettings()
+            ensureActive()
+            _uiState.update { it.copy(quickSettings = settings) }
+        }
+    }
+
+    /**
+     * Writes one quick setting. MMKV writes are memory-mapped, so this runs on the caller's thread
+     * and the activity can restart the connection right after it returns.
+     */
+    fun applyQuickSetting(setting: QuickSetting, enabled: Boolean) {
+        try {
+            dataSource.writeQuickSetting(setting, enabled)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to change quick setting $setting", e)
+            toastError(R.string.toast_failure)
+        }
+        refreshQuickSettings()
     }
 
     // ---------- Group & server loading ----------
@@ -395,7 +455,8 @@ class MainViewModel(
         val filteredServers = applyKeywordFilter(servers)
         mutableServerGroupState(groupId).value = ServerGroupUiState(
             servers = filteredServers,
-            rows = buildServerRows(groupId, filteredServers)
+            rows = buildServerRows(groupId, filteredServers),
+            loaded = true,
         )
     }
 
@@ -421,29 +482,12 @@ class MainViewModel(
 
     fun getSubscriptions(): List<SubscriptionCache> = dataSource.getSubscriptions()
 
-    private fun resolveSelectedGroup(groups: List<GroupMapItem>): String {
-        val current = uiState.value.selectedGroupId
-        val resolved = when {
-            groups.isEmpty() -> ""
-            groups.any { it.id == current } -> current
-            else -> groups.first().id
+    /** The servers tab lists every subscription together, so list actions always apply to all servers. */
+    private fun resolveSelectedGroup(): String {
+        if (dataSource.getSelectedSubscriptionId() != ALL_GROUP_ID) {
+            dataSource.setSelectedSubscriptionId(ALL_GROUP_ID)
         }
-        if (resolved != current) {
-            dataSource.setSelectedSubscriptionId(resolved)
-        }
-        return resolved
-    }
-
-    private fun radialPreloadOrder(groups: List<GroupMapItem>, selectedIndex: Int): List<String> {
-        if (groups.isEmpty()) return emptyList()
-        val result = ArrayList<String>((groups.size - 1).coerceAtLeast(0))
-        for (distance in 1 until groups.size) {
-            val right = selectedIndex + distance
-            val left = selectedIndex - distance
-            if (right in groups.indices) result += groups[right].id
-            if (left in groups.indices) result += groups[left].id
-        }
-        return result
+        return ALL_GROUP_ID
     }
 
     fun setupGroupTab(forceRefresh: Boolean = false): Job {
@@ -456,17 +500,18 @@ class MainViewModel(
                 if (forceRefresh) {
                     cacheMutex.withLock { groupDataCache.clear() }
                 }
-                val groups = dataSource.getSubscriptions().map {
+                val groups = dataSource.getSubscriptions().filter { it.guid != ALL_GROUP_ID }.map {
                     GroupMapItem(
                         id = it.guid,
                         remarks = it.subscription.remarks,
                         usageInfo = it.subscription.usageInfo?.let { info ->
                             SubscriptionInfoParser.withWebPageFallback(info, it.subscription.url)
                         },
+                        lastUpdated = it.subscription.lastUpdated,
                     )
                 }
-                val selectedGroup = resolveSelectedGroup(groups)
-                val validIds = groups.mapTo(HashSet()) { it.id }
+                val selectedGroup = resolveSelectedGroup()
+                val validIds = groups.mapTo(HashSet()) { it.id } + ALL_GROUP_ID
                 groupUiFlows.keys.removeAll { it !in validIds }
                 groupServerFlows.keys.removeAll { it !in validIds }
                 groupLoadMutexes.keys.removeAll { it !in validIds }
@@ -478,31 +523,15 @@ class MainViewModel(
                         selectedGuid = dataSource.getSelectServer(),
                     )
                 }
-                groups.forEach { mutableServerGroupState(it.id) }
 
-                if (groups.isEmpty()) {
-                    cacheMutex.withLock { groupDataCache.clear() }
-                    return@launch
-                }
-
-                val selectedServers = loadGroup(selectedGroup, forceRefresh)
-                updateGroupUi(selectedGroup, selectedServers)
+                // Only the all-servers list is shown, so per-subscription lists are never preloaded.
+                val servers = loadGroup(ALL_GROUP_ID, forceRefresh)
+                updateGroupUi(ALL_GROUP_ID, servers)
 
                 if (!initialPageReady.isCompleted) {
                     initialPageReady.complete(Unit)
                 }
-
-                val selectedIndex =
-                    groups.indexOfFirst { it.id == selectedGroup }.coerceAtLeast(0)
-                val preloadOrder = radialPreloadOrder(groups, selectedIndex)
-                preloadJob = viewModelScope.launch(preloadDispatcher) {
-                    preloadOrder.forEach { groupId ->
-                        ensureActive()
-                        delay(32)
-                        val servers = loadGroup(groupId, forceRefresh)
-                        updateGroupUi(groupId, servers)
-                    }
-                }
+                maybeAutoPing(servers)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -526,10 +555,14 @@ class MainViewModel(
                     when {
                         count > 0 -> {
                             toast(dataSource.getString(R.string.title_import_config_count, count))
+                            autoPingDone = false
                             setupGroupTab(forceRefresh = true)
                         }
 
-                        countSub > 0 -> setupGroupTab(forceRefresh = true)
+                        countSub > 0 -> {
+                            autoPingDone = false
+                            setupGroupTab(forceRefresh = true)
+                        }
                         else -> toastError(R.string.toast_failure)
                     }
                 } catch (cancelled: CancellationException) {
@@ -777,10 +810,122 @@ class MainViewModel(
         }
     }
 
+    /** A server picked by hand in the list; this turns smart selection off. */
     fun updateSelectedGuid(guid: String) {
+        setSmartSelect(false)
+        selectGuid(guid)
+    }
+
+    private fun selectGuid(guid: String) {
         dataSource.setSelectServer(guid)
         _uiState.update { it.copy(selectedGuid = guid) }
         loadSelectedServer()
+    }
+
+    private fun setSmartSelect(enabled: Boolean) {
+        if (uiState.value.smartSelect == enabled) return
+        dataSource.setSmartSelect(enabled)
+        _uiState.update { it.copy(smartSelect = enabled) }
+    }
+
+    /**
+     * Applies smart selection right before a connection starts.
+     * @return true when the selected server changed.
+     */
+    fun prepareConnect(): Boolean {
+        _uiState.update { it.copy(connectionError = null) }
+        if (!uiState.value.smartSelect) return false
+        val guid = pickSmartServer(serverCatalog.value.rows) ?: return false
+        if (guid == uiState.value.selectedGuid) return false
+        selectGuid(guid)
+        return true
+    }
+
+    /** Turns smart selection on and selects its server. @return true when the selected server changed. */
+    fun selectSmart(): Boolean {
+        setSmartSelect(true)
+        val guid = pickSmartServer(serverCatalog.value.rows) ?: return false
+        if (guid == uiState.value.selectedGuid) return false
+        selectGuid(guid)
+        return true
+    }
+
+    /** Selects the fastest server of [country]. @return false when the country has no server. */
+    fun selectCountry(country: ServerCountry): Boolean {
+        val guid = pickCountryServer(serverCatalog.value.rows, country) ?: return false
+        setSmartSelect(false)
+        _uiState.update { it.copy(connectionError = null) }
+        if (guid != uiState.value.selectedGuid) selectGuid(guid)
+        return true
+    }
+
+    /** Selects the fastest server other than the one that just failed. @return false when none is left. */
+    fun selectOtherServer(): Boolean {
+        val failed = uiState.value.connectionError?.serverGuid ?: uiState.value.selectedGuid
+        val guid = pickSmartServer(serverCatalog.value.rows, excluding = setOfNotNull(failed)) ?: return false
+        _uiState.update { it.copy(connectionError = null) }
+        selectGuid(guid)
+        return true
+    }
+
+    private fun showConnectionError() {
+        val state = uiState.value
+        _uiState.update {
+            it.copy(
+                connectionError = ConnectionErrorUiModel(
+                    serverGuid = state.selectedGuid,
+                    serverName = state.selectedServer?.remarks?.let(::serverDisplayName),
+                ),
+            )
+        }
+    }
+
+    /** Measures the running connection once it settled, for the home ping and IP. */
+    private fun scheduleCurrentServerTest() {
+        currentServerTestJob?.cancel()
+        currentServerTestJob = viewModelScope.launch {
+            delay(CURRENT_SERVER_TEST_DELAY_MS)
+            if (uiState.value.isRunning && !testRequests.isTesting) testCurrentServerRealPing()
+        }
+    }
+
+    /** Measures every server once per session so smart selection and the ping bars have data. */
+    private fun maybeAutoPing(servers: List<ServersCache>) {
+        if (servers.isEmpty()) return
+        viewModelScope.launch {
+            if (autoPingDone || uiState.value.isRunning || testRequests.isTesting) return@launch
+            autoPingDone = true
+            testAllRealPing()
+        }
+    }
+
+    private fun startLiveTraffic() {
+        if (liveTrafficJob?.isActive == true) return
+        liveTrafficJob = viewModelScope.launch(ioDispatcher) {
+            var previous = dataSource.readAppTrafficBytes() ?: return@launch
+            var previousAt = System.currentTimeMillis()
+            _liveTraffic.value = LiveTrafficUiModel()
+            while (true) {
+                delay(LIVE_TRAFFIC_INTERVAL_MS)
+                val current = dataSource.readAppTrafficBytes() ?: return@launch
+                val now = System.currentTimeMillis()
+                _liveTraffic.value = nextLiveTraffic(
+                    previous = _liveTraffic.value,
+                    rxDeltaBytes = current.first - previous.first,
+                    txDeltaBytes = current.second - previous.second,
+                    elapsedMillis = now - previousAt,
+                    historySize = LIVE_TRAFFIC_HISTORY,
+                )
+                previous = current
+                previousAt = now
+            }
+        }
+    }
+
+    private fun stopLiveTraffic() {
+        liveTrafficJob?.cancel()
+        liveTrafficJob = null
+        _liveTraffic.value = LiveTrafficUiModel()
     }
 
     fun refreshSelectedGuid() {
@@ -791,12 +936,15 @@ class MainViewModel(
     /** Called by the activity once it has asked the service to start. */
     fun markConnecting() {
         if (uiState.value.isRunning) return
-        _uiState.update { it.copy(isConnecting = true) }
+        _uiState.update { it.copy(isConnecting = true, connectionError = null) }
         connectingTimeoutJob?.cancel()
         connectingTimeoutJob = viewModelScope.launch {
             // The service normally answers within seconds; never leave the spinner running forever.
             delay(CONNECTING_TIMEOUT_MS)
-            _uiState.update { it.copy(isConnecting = false) }
+            if (!uiState.value.isRunning && uiState.value.isConnecting) {
+                _uiState.update { it.copy(isConnecting = false) }
+                showConnectionError()
+            }
         }
     }
 
@@ -935,7 +1083,7 @@ class MainViewModel(
         resetTestStatus()
         viewModelScope.launch(ioDispatcher) {
             cacheMutex.withLock { groupDataCache.clear() }
-            reloadAllGroups(_uiState.value.groups.map { it.id })
+            reloadAllGroups(listOf(ALL_GROUP_ID))
         }
     }
 
@@ -964,10 +1112,17 @@ class MainViewModel(
     private fun updateRunningState(running: Boolean, clearTestingText: Boolean = true, startedNow: Boolean = false) {
         if (!running || clearTestingText) testRequests.invalidateCurrent()
         connectingTimeoutJob?.cancel()
+        if (running) {
+            startLiveTraffic()
+        } else {
+            stopLiveTraffic()
+            currentServerTestJob?.cancel()
+        }
         _uiState.update { state ->
             state.copy(
                 isRunning = running,
                 isConnecting = false,
+                currentServerTest = if (running) state.currentServerTest else null,
                 connectedSinceMillis = when {
                     !running -> null
                     startedNow -> System.currentTimeMillis()
@@ -981,6 +1136,9 @@ class MainViewModel(
     }
 
     override fun onCleared() {
+        liveTrafficJob?.cancel()
+        currentServerTestJob?.cancel()
+        quickSettingsJob?.cancel()
         selectedServerJob?.cancel()
         connectingTimeoutJob?.cancel()
         setupGroupJob?.cancel()
@@ -1007,5 +1165,11 @@ class MainViewModel(
     private companion object {
         const val TEST_RESULT_FLUSH_INTERVAL_MS = 500L
         const val CONNECTING_TIMEOUT_MS = 20_000L
+        const val CURRENT_SERVER_TEST_DELAY_MS = 1_500L
+        const val LIVE_TRAFFIC_INTERVAL_MS = 1_000L
+        const val LIVE_TRAFFIC_HISTORY = 60
+
+        /** Group ID of the list that holds every server of every subscription. */
+        const val ALL_GROUP_ID = ""
     }
 }

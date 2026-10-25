@@ -46,6 +46,14 @@ android {
                 "proguard-rules.pro"
             )
         }
+        // Installable test build that runs like release (not debuggable, so Compose and Kotlin run at
+        // full speed) but is signed with the debug key; the release keystore stays with its owner.
+        create("qa") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
+        }
     }
 
     flavorDimensions.add("distribution")

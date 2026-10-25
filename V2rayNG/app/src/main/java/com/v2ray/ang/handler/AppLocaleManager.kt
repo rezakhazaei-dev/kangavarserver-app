@@ -21,6 +21,7 @@ object AppLocaleManager {
      * Migrates the existing MMKV language preference and restores it before the first activity.
      */
     fun initialize(context: Context) {
+        applyBrandDefaultLanguage(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Api33.prepareMigration(context)
         } else {
@@ -66,6 +67,22 @@ object AppLocaleManager {
         return context.createConfigurationContext(configuration)
     }
 
+    /**
+     * Bazhiko is a Persian app: once per install, an install that still follows the system language
+     * switches to Persian. A language picked later in the settings is kept.
+     */
+    private fun applyBrandDefaultLanguage(context: Context) {
+        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_BRAND_LANGUAGE_APPLIED, false)) return
+        MmkvManager.encodeSettings(AppConfig.PREF_BRAND_LANGUAGE_APPLIED, true)
+        if (storedLanguage() != Language.AUTO) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Api33.applyDefault(context, Language.PERSIAN)
+        } else if (LocaleManagerCompat.getApplicationLocales(context).isEmpty) {
+            // initializeCompat() hands the stored language to AppCompat on this same launch.
+            persistLegacyPreference(Language.PERSIAN)
+        }
+    }
+
     private fun initializeCompat(context: Context) {
         val storedLocales = LocaleManagerCompat.getApplicationLocales(context)
         if (storedLocales.isEmpty) {
@@ -96,6 +113,13 @@ object AppLocaleManager {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private object Api33 {
+        fun applyDefault(context: Context, language: Language) {
+            val localeManager = context.getSystemService(LocaleManager::class.java)
+            if (!localeManager.applicationLocales.isEmpty) return
+            localeManager.applicationLocales = android.os.LocaleList(requireNotNull(language.locale))
+            persistLegacyPreference(language)
+        }
+
         fun prepareMigration(context: Context) {
             if (MmkvManager.decodeSettingsBool(AppConfig.PREF_APP_LOCALE_MIGRATED, false)) {
                 return

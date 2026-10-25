@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.TrafficStats
+import android.os.Process
 import androidx.core.content.ContextCompat
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
@@ -231,5 +233,44 @@ class MainRepository(
 
     override fun initAssets() {
         SettingsManager.initAssets(app, app.assets)
+    }
+
+    override fun getSmartSelect(): Boolean =
+        MmkvManager.decodeSettingsBool(AppConfig.PREF_SMART_SELECT, true)
+
+    override fun setSmartSelect(enabled: Boolean) {
+        MmkvManager.encodeSettings(AppConfig.PREF_SMART_SELECT, enabled)
+    }
+
+    override fun readQuickSettings(): QuickSettingsUiModel = QuickSettingsUiModel(
+        vpnMode = SettingsManager.isVpnMode(),
+        iranDirect = SettingsManager.isIranDirectEnabled(),
+        perAppEnabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY, false),
+        perAppBypass = MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS, false),
+        perAppCount = MmkvManager.decodeSettingsStringSet(AppConfig.PREF_PER_APP_PROXY_SET)?.size ?: 0,
+        antiFilter = MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false),
+        autoConnect = MmkvManager.decodeSettingsBool(AppConfig.PREF_IS_BOOTED, false),
+        proMode = MmkvManager.decodeSettingsBool(AppConfig.PREF_PRO_MODE, false),
+    )
+
+    override fun writeQuickSetting(setting: QuickSetting, enabled: Boolean) {
+        when (setting) {
+            QuickSetting.VpnMode ->
+                MmkvManager.encodeSettings(AppConfig.PREF_MODE, if (enabled) AppConfig.VPN else AppConfig.PROXY_ONLY)
+
+            QuickSetting.IranDirect -> SettingsManager.setIranDirectEnabled(app, enabled)
+            QuickSetting.AntiFilter -> MmkvManager.encodeSettings(AppConfig.PREF_FRAGMENT_ENABLED, enabled)
+            QuickSetting.AutoConnect -> MmkvManager.encodeSettings(AppConfig.PREF_IS_BOOTED, enabled)
+            QuickSetting.ProMode -> MmkvManager.encodeSettings(AppConfig.PREF_PRO_MODE, enabled)
+        }
+    }
+
+    override fun readAppTrafficBytes(): Pair<Long, Long>? {
+        // The core runs in the daemon process under this same UID, so the UID counters include it.
+        val uid = Process.myUid()
+        val rx = TrafficStats.getUidRxBytes(uid)
+        val tx = TrafficStats.getUidTxBytes(uid)
+        if (rx == TrafficStats.UNSUPPORTED.toLong() || tx == TrafficStats.UNSUPPORTED.toLong()) return null
+        return rx to tx
     }
 }

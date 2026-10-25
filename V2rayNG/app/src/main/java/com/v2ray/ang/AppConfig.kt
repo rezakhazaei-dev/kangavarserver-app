@@ -83,6 +83,15 @@ object AppConfig {
     const val PREF_ROOT_MODE_ENABLE = "pref_root_mode_enabled"
     const val PREF_ROOT_LAN_SHARING = "pref_root_lan_sharing"
     const val PREF_IS_BOOTED = "pref_is_booted"
+
+    /** Bazhiko: connect to the fastest measured server instead of the selected one. */
+    const val PREF_SMART_SELECT = "pref_bazhiko_smart_select"
+
+    /** Bazhiko: the settings tab also lists the advanced v2rayNG screens. */
+    const val PREF_PRO_MODE = "pref_bazhiko_pro_mode"
+
+    /** Bazhiko: Persian has been applied once as the default app language. */
+    const val PREF_BRAND_LANGUAGE_APPLIED = "pref_bazhiko_language_applied"
     const val PREF_CHECK_UPDATE_PRE_RELEASE = "pref_check_update_pre_release"
     const val PREF_GEO_FILES_SOURCES = "pref_geo_files_sources"
     const val PREF_USE_HEV_TUNNEL = "pref_use_hev_tunnel_v2"
@@ -230,6 +239,9 @@ object AppConfig {
 
     /** Give a good name to this, IDK*/
     const val VPN = "VPN"
+
+    /** [PREF_MODE] value of the proxy-only mode, as listed by the `mode_value` array. */
+    const val PROXY_ONLY = "Proxy only"
     const val VPN_MTU = 1500
 
     /** Root (system-wide) mode runtime constants. */

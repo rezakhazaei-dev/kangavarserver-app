@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import com.v2ray.ang.handler.AppLocaleManager
 import com.v2ray.ang.ui.compose.AppTheme
+import com.v2ray.ang.ui.compose.resolveDarkTheme
 
 abstract class BaseComponentActivity : AppCompatActivity() {
 
@@ -15,11 +16,14 @@ abstract class BaseComponentActivity : AppCompatActivity() {
         AppLocaleManager.onActivityCreated(this)
         enableEdgeToEdge()
         setContent {
-            AppTheme {
+            AppTheme(darkTheme = if (alwaysDarkTheme) true else resolveDarkTheme()) {
                 ScreenContent()
             }
         }
     }
+
+    /** True for a screen drawn in the brand's dark look whatever the app theme (the main screen). */
+    protected open val alwaysDarkTheme: Boolean = false
 
     @Composable
     protected abstract fun ScreenContent()

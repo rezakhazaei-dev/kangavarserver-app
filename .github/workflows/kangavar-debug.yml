@@ -1,7 +1,8 @@
-name: Kangavar debug APK
+name: Bazhiko test APK
 
-# Builds an unsigned-for-release (debug-signed) APK for every PR and push,
-# so changes can be installed and tested without the release keystore.
+# Builds a debug-signed QA APK for every PR and push, so changes can be installed and tested
+# without the release keystore. QA is the release build type (not debuggable, so it runs at
+# release speed) signed with the debug key.
 
 on:
   workflow_dispatch:
@@ -82,21 +83,21 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Unit tests and debug APK
+    - name: Unit tests and QA APK
       run: |
         cd ${{ github.workspace }}/V2rayNG
         echo "sdk.dir=${ANDROID_HOME}" > local.properties
         chmod 755 gradlew
-        ./gradlew :app:testPlaystoreDebugUnitTest :app:assemblePlaystoreDebug
+        ./gradlew :app:testPlaystoreDebugUnitTest :app:assemblePlaystoreQa
 
     - name: Upload arm64-v8a APK
       uses: actions/upload-artifact@v7
       with:
-        name: kangavar-debug-arm64-v8a
-        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/playstore/debug/*arm64-v8a*.apk
+        name: bazhiko-qa-arm64-v8a
+        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/playstore/qa/*arm64-v8a*.apk
 
     - name: Upload universal APK
       uses: actions/upload-artifact@v7
       with:
-        name: kangavar-debug-universal
-        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/playstore/debug/*universal*.apk
+        name: bazhiko-qa-universal
+        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/playstore/qa/*universal*.apk

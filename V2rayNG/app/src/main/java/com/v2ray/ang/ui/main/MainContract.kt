@@ -31,7 +31,20 @@ data class MainUiState(
     val locateTarget: LocateTarget? = null,
     val confirmRemove: Boolean = false,
     val doubleColumnDisplay: Boolean = false,
-    val shareQRCodeBitmap: android.graphics.Bitmap? = null
+    val shareQRCodeBitmap: android.graphics.Bitmap? = null,
+    /** Connect to the fastest measured server instead of [selectedGuid]. */
+    val smartSelect: Boolean = true,
+    /** The last start attempt failed; null once dismissed or connected. */
+    val connectionError: ConnectionErrorUiModel? = null,
+    /** Delay and exit IP of the running connection, measured right after it started. */
+    val currentServerTest: ConnectionTestResult? = null,
+    val quickSettings: QuickSettingsUiModel = QuickSettingsUiModel(),
+)
+
+/** Why the home tab shows its error screen. */
+data class ConnectionErrorUiModel(
+    val serverGuid: String?,
+    val serverName: String?,
 )
 
 /**
@@ -74,4 +87,13 @@ sealed interface MainAction {
     data class ImportBatchConfig(val configText: String) : MainAction
 
     data object LocateHandled : MainAction
+
+    /** Connect through the fastest server of one country (home quick-connect chips). */
+    data class QuickConnect(val country: ServerCountry) : MainAction
+    /** Use smart selection again (servers tab "smart" row). */
+    data object SelectSmart : MainAction
+    /** After a failed start: connect through the fastest server other than the failed one. */
+    data object RetryOtherServer : MainAction
+    data object DismissConnectionError : MainAction
+    data class ChangeQuickSetting(val setting: QuickSetting, val enabled: Boolean) : MainAction
 }

@@ -77,4 +77,62 @@ class MainHomeModelsTest {
         assertTrue(isArabicScript("باژیکو"))
         assertFalse(isArabicScript("BAZHIKO"))
     }
+
+    @Test
+    fun homeScreenModePriorities() {
+        fun mode(loaded: Boolean = true, servers: Boolean = true, running: Boolean = false, connecting: Boolean = false, error: Boolean = false, blocked: Boolean = false) =
+            homeScreenMode(loaded, servers, running, connecting, error, blocked)
+        assertEquals(HomeScreenMode.Welcome, mode(servers = false))
+        // Until the list has loaded once, the welcome screen must not flash.
+        assertEquals(HomeScreenMode.Main, mode(loaded = false, servers = false))
+        assertEquals(HomeScreenMode.Main, mode(running = true, error = true, blocked = true))
+        assertEquals(HomeScreenMode.Main, mode(connecting = true, error = true))
+        assertEquals(HomeScreenMode.Error, mode(error = true, blocked = true))
+        assertEquals(HomeScreenMode.Expired, mode(blocked = true))
+        assertEquals(HomeScreenMode.Main, mode())
+    }
+
+    @Test
+    fun subscriptionBlockedWhenExpiredOrQuotaUsedUp() {
+        assertTrue(buildSubscriptionSummary(SubscriptionUsageInfo(download = 1000, total = 1000), now).isBlocked())
+        assertTrue(buildSubscriptionSummary(SubscriptionUsageInfo(total = 1000, expire = now / 1000 - 10), now).isBlocked())
+        assertFalse(buildSubscriptionSummary(SubscriptionUsageInfo(download = 10, total = 1000), now).isBlocked())
+        assertFalse(buildSubscriptionSummary(SubscriptionUsageInfo(download = 10), now).isBlocked())
+    }
+
+    @Test
+    fun liveTrafficTurnsCounterDeltasIntoRates() {
+        var traffic = LiveTrafficUiModel()
+        traffic = nextLiveTraffic(traffic, rxDeltaBytes = 2000, txDeltaBytes = 500, elapsedMillis = 500, historySize = 2)
+        assertEquals(4000L, traffic.downloadBytesPerSecond)
+        assertEquals(1000L, traffic.uploadBytesPerSecond)
+        assertEquals(2500L, traffic.sessionBytes)
+        traffic = nextLiveTraffic(traffic, rxDeltaBytes = -50, txDeltaBytes = 100, elapsedMillis = 0, historySize = 2)
+        assertEquals(0L, traffic.downloadBytesPerSecond)
+        assertEquals(100L, traffic.uploadBytesPerSecond)
+        assertEquals(2600L, traffic.sessionBytes)
+        traffic = nextLiveTraffic(traffic, rxDeltaBytes = 1000, txDeltaBytes = 0, elapsedMillis = 1000, historySize = 2)
+        assertEquals(listOf(0L, 1000L), traffic.downloadHistory)
+    }
+
+    @Test
+    fun decimalsUseTheLocaleDigitsWithoutGrouping() {
+        assertEquals("12.4", formatDecimal(12.44, Locale.US))
+        assertEquals("1234", formatDecimal(1234.0, Locale.US))
+        assertEquals("۳۱٫۶", formatDecimal(31.6, Locale.forLanguageTag("fa")))
+        assertEquals(1.0, megabitsPerSecond(125_000), 0.0001)
+        assertEquals(1.0, gigabytes(1024L * 1024L * 1024L), 0.0001)
+    }
+
+    @Test
+    fun timeAgoPicksTheLargestUnit() {
+        val minute = 60_000L
+        assertNull(timeAgo(-1L, now))
+        assertEquals(AgoUnit.JustNow to 0L, timeAgo(now - 30_000L, now))
+        assertEquals(AgoUnit.Minutes to 5L, timeAgo(now - 5 * minute, now))
+        assertEquals(AgoUnit.Hours to 2L, timeAgo(now - 125 * minute, now))
+        assertEquals(AgoUnit.Days to 3L, timeAgo(now - 3 * day - minute, now))
+        // A clock that moved backwards reads as just now.
+        assertEquals(AgoUnit.JustNow to 0L, timeAgo(now + minute, now))
+    }
 }

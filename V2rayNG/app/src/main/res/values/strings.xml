@@ -710,6 +710,13 @@
     <string name="bz_backup_sub">Subscriptions and settings</string>
     <string name="bz_version">Version &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">Based on v2rayNG by 2dust · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">Only these use VPN</string>
+    <string name="bz_apps_all_except">All except these</string>
+    <string name="bz_apps_hint_bypass">Leave Iranian apps direct so they are faster and are not blocked for using a foreign IP.</string>
+    <string name="bz_apps_hint_only">Only the ticked apps use the VPN; every other app connects directly.</string>
+    <string name="bz_apps_search">Search apps</string>
+    <string name="bz_apps_clear_search">Clear search</string>
+    <string name="bz_apps_none">No apps found</string>
     <plurals name="bz_days">
         <item quantity="one">%1$s day</item>
         <item quantity="other">%1$s days</item>

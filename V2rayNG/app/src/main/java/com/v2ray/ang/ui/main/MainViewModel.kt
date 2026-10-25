@@ -100,6 +100,12 @@ class MainViewModel(
     @Volatile
     private var autoPingDone = false
 
+    /** True while the foreground subscription refresh runs; the automatic ping waits for it. */
+    @Volatile
+    private var subscriptionRefreshRunning = false
+    private var openRefreshJob: Job? = null
+    private var lastOpenRefreshMillis: Long? = null
+
     // ---------- Keyword filtering ----------
     @Volatile
     private var keywordFilter: String = ""
@@ -365,6 +371,38 @@ class MainViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 LogUtil.e(AppConfig.TAG, "Main background initialization failed", error)
+            }
+        }
+    }
+
+    /**
+     * Updates every subscription (traffic, expiry, servers) each time the app comes to the
+     * foreground, silently and at most once per [OPEN_REFRESH_INTERVAL_MS].
+     */
+    fun refreshSubscriptionsOnOpen(nowMillis: Long) {
+        if (openRefreshJob?.isActive == true) return
+        if (!shouldRefreshSubscriptionsOnOpen(lastOpenRefreshMillis, nowMillis, OPEN_REFRESH_INTERVAL_MS)) return
+        lastOpenRefreshMillis = nowMillis
+        subscriptionRefreshRunning = true
+        openRefreshJob = viewModelScope.launch(ioDispatcher) {
+            var updated = false
+            try {
+                initialPageReady.await()
+                updated = dataSource.updateConfigViaSubAll().successCount > 0
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                LogUtil.e(AppConfig.TAG, "Subscription refresh on open failed", e)
+            } finally {
+                subscriptionRefreshRunning = false
+            }
+            if (updated) {
+                // An update gives the servers new IDs, so they need a fresh ping.
+                autoPingDone = false
+                setupGroupTab(forceRefresh = true)
+                refreshSelectedGuid()
+            } else {
+                maybeAutoPing(mutableServerGroupState(ALL_GROUP_ID).value.servers)
             }
         }
     }
@@ -893,7 +931,7 @@ class MainViewModel(
     private fun maybeAutoPing(servers: List<ServersCache>) {
         if (servers.isEmpty()) return
         viewModelScope.launch {
-            if (autoPingDone || uiState.value.isRunning || testRequests.isTesting) return@launch
+            if (autoPingDone || subscriptionRefreshRunning || uiState.value.isRunning || testRequests.isTesting) return@launch
             autoPingDone = true
             testAllRealPing()
         }
@@ -1168,6 +1206,7 @@ class MainViewModel(
         const val CURRENT_SERVER_TEST_DELAY_MS = 1_500L
         const val LIVE_TRAFFIC_INTERVAL_MS = 1_000L
         const val LIVE_TRAFFIC_HISTORY = 60
+        const val OPEN_REFRESH_INTERVAL_MS = 60_000L
 
         /** Group ID of the list that holds every server of every subscription. */
         const val ALL_GROUP_ID = ""

@@ -717,6 +717,13 @@
     <string name="bz_backup_sub">الاشتراكات والإعدادات</string>
     <string name="bz_version">الإصدار &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">مبني على v2rayNG من 2dust · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">هذه فقط عبر VPN</string>
+    <string name="bz_apps_all_except">الكل باستثناء هذه</string>
+    <string name="bz_apps_hint_bypass">اترك التطبيقات الإيرانية مباشرة لتكون أسرع ولا تُحظر بسبب IP أجنبي.</string>
+    <string name="bz_apps_hint_only">التطبيقات المحددة فقط تستخدم VPN، وتتصل البقية مباشرة.</string>
+    <string name="bz_apps_search">البحث في التطبيقات</string>
+    <string name="bz_apps_clear_search">مسح البحث</string>
+    <string name="bz_apps_none">لم يُعثر على تطبيقات</string>
     <plurals name="bz_days">
         <item quantity="zero">%1$s يوم</item>
         <item quantity="one">%1$s يوم</item>

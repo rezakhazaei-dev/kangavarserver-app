@@ -1,5 +1,6 @@
 package com.v2ray.ang.ui.main
 
+import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.entities.SubscriptionUsageInfo
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -134,5 +135,32 @@ class MainHomeModelsTest {
         assertEquals(AgoUnit.Days to 3L, timeAgo(now - 3 * day - minute, now))
         // A clock that moved backwards reads as just now.
         assertEquals(AgoUnit.JustNow to 0L, timeAgo(now + minute, now))
+    }
+
+    @Test
+    fun usedFractionIsTheColouredPart() {
+        val now = 1_000_000L
+        assertEquals(0.25f, buildSubscriptionSummary(SubscriptionUsageInfo(download = 250, total = 1000), now).usedFraction!!, 0.0001f)
+        assertEquals(1f, buildSubscriptionSummary(SubscriptionUsageInfo(download = 2000, total = 1000), now).usedFraction!!, 0.0001f)
+        assertEquals(0f, buildSubscriptionSummary(SubscriptionUsageInfo(total = 1000), now).usedFraction!!, 0.0001f)
+        assertNull(buildSubscriptionSummary(SubscriptionUsageInfo(download = 5), now).usedFraction)
+    }
+
+    @Test
+    fun subscriptionsRefreshOnOpenAtMostOncePerInterval() {
+        assertTrue(shouldRefreshSubscriptionsOnOpen(null, 5_000L, 60_000L))
+        assertFalse(shouldRefreshSubscriptionsOnOpen(5_000L, 64_999L, 60_000L))
+        assertTrue(shouldRefreshSubscriptionsOnOpen(5_000L, 65_000L, 60_000L))
+        // A clock that went backwards (reboot) does not block the refresh.
+        assertTrue(shouldRefreshSubscriptionsOnOpen(90_000L, 1_000L, 60_000L))
+    }
+
+    @Test
+    fun subscriptionRowPrefersThePanelServiceName() {
+        val withName = GroupMapItem("g1", "import sub", SubscriptionUsageInfo(serviceName = "reza"))
+        assertEquals("reza", subscriptionDisplayName(withName))
+        assertEquals("import sub", subscriptionDisplayName(GroupMapItem("g2", "import sub", SubscriptionUsageInfo())))
+        assertEquals("Default", subscriptionDisplayName(GroupMapItem("g3", "Default")))
+        assertEquals("x", subscriptionDisplayName(GroupMapItem("g4", "x", SubscriptionUsageInfo(serviceName = " "))))
     }
 }

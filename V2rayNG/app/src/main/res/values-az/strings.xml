@@ -709,6 +709,13 @@
     <string name="bz_backup_sub">Abunələr və ayarlar</string>
     <string name="bz_version">Versiya &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">2dust-un v2rayNG əsasında · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">Yalnız bunlar VPN ilə</string>
+    <string name="bz_apps_all_except">Bunlardan başqa hamısı</string>
+    <string name="bz_apps_hint_bypass">İran tətbiqlərini birbaşa saxlayın ki, daha sürətli olsun və xarici IP-yə görə bloklanmasın.</string>
+    <string name="bz_apps_hint_only">VPN-dən yalnız işarələnmiş tətbiqlər istifadə edir, qalanları birbaşa qoşulur.</string>
+    <string name="bz_apps_search">Tətbiq axtar</string>
+    <string name="bz_apps_clear_search">Axtarışı təmizlə</string>
+    <string name="bz_apps_none">Tətbiq tapılmadı</string>
     <plurals name="bz_days">
         <item quantity="one">%1$s gün</item>
         <item quantity="other">%1$s gün</item>

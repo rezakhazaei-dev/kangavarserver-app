@@ -107,7 +107,7 @@ internal fun MainServersTab(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 16.dp),
+            contentPadding = PaddingValues(top = if (presentCountries.size > 1) 0.dp else 12.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -191,7 +191,7 @@ private fun CountryFilter(
         Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(top = 4.dp, bottom = 12.dp),
+            .padding(top = 14.dp, bottom = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         chips.forEach { (key, label, count) ->
@@ -287,10 +287,9 @@ private fun CountryHeader(country: ServerCountry) {
     ) {
         BzFlag(country, 20.dp, ring = false)
         Text(stringResource(country.labelRes), style = bzText(13.sp, FontWeight.Bold, Bz.Muted))
-        if (country == ServerCountry.Usa) {
-            Spacer(Modifier.weight(1f))
-            BzTag(stringResource(R.string.bz_us_tag), warm = true)
-        }
+        // Every exit has a static IP, so each country shows the tag (Reza, 2026-10-25).
+        Spacer(Modifier.weight(1f))
+        BzTag(stringResource(R.string.bz_us_tag), warm = true)
     }
 }
 

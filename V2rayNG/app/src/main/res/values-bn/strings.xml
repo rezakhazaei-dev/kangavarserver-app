@@ -709,6 +709,13 @@
     <string name="bz_backup_sub">সাবস্ক্রিপশন ও সেটিংস</string>
     <string name="bz_version">সংস্করণ &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">2dust-এর v2rayNG ভিত্তিক · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">শুধু এগুলো VPN দিয়ে</string>
+    <string name="bz_apps_all_except">এগুলো ছাড়া সব</string>
+    <string name="bz_apps_hint_bypass">ইরানি অ্যাপগুলো সরাসরি রাখুন, এতে দ্রুত চলবে এবং বিদেশি IP-র কারণে আটকে যাবে না।</string>
+    <string name="bz_apps_hint_only">শুধু টিক দেওয়া অ্যাপগুলো VPN ব্যবহার করে, বাকিগুলো সরাসরি যুক্ত হয়।</string>
+    <string name="bz_apps_search">অ্যাপ খুঁজুন</string>
+    <string name="bz_apps_clear_search">খোঁজা মুছুন</string>
+    <string name="bz_apps_none">কোনো অ্যাপ পাওয়া যায়নি</string>
     <plurals name="bz_days">
         <item quantity="one">%1$s দিন</item>
         <item quantity="other">%1$s দিন</item>

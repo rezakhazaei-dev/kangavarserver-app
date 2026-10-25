@@ -96,7 +96,7 @@ internal fun MainSubscriptionTab(
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 16.dp),
+                .padding(top = if (layout.shortHeight) 8.dp else 14.dp, bottom = 16.dp),
         ) {
             if (groups.isEmpty()) {
                 EmptySubscription(onOpenAddSheet, openBot)
@@ -143,7 +143,7 @@ private fun PlanCard(
         }
         Text(
             info?.title?.takeIf { it.isNotBlank() } ?: group.remarks,
-            style = bzText(18.sp, FontWeight.ExtraBold),
+            style = bzText(18.sp, FontWeight.ExtraBold).copy(textDirection = TextDirection.Content),
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -175,7 +175,7 @@ private fun PlanCard(
                 { onAction(MainAction.OpenSubscriptionLink(info?.supportUrl ?: AppConfig.BRAND_TELEGRAM_BOT_URL)) },
                 Modifier.weight(1f),
                 style = BzButtonStyle.Outlined,
-                iconRes = R.drawable.ic_ms_send,
+                iconRes = R.drawable.ic_ms_support_agent,
                 height = 44.dp,
                 fontSize = 14.sp,
             )
@@ -221,7 +221,8 @@ private fun androidx.compose.foundation.layout.RowScope.KeyValue(value: String, 
 
 @Composable
 private fun Donut(summary: SubscriptionSummaryUiModel, numbers: BzNumbers) {
-    val fraction = summary.remainingFraction ?: 1f
+    // The coloured arc is the used part; the empty track is what is left (Reza, 2026-10-25).
+    val fraction = summary.usedFraction ?: 0f
     val remaining = summary.remainingBytes
     val center = if (remaining != null) numbers.dec(gigabytes(remaining)) else "∞"
     val caption = if (remaining != null) stringResource(R.string.bz_gb_remaining) else stringResource(R.string.sub_info_unlimited)
@@ -294,11 +295,12 @@ private fun SubscriptionRow(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val blocked = group.usageInfo?.let { buildSubscriptionSummary(it, now).isBlocked() } == true
+    val name = subscriptionDisplayName(group)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = 14.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -315,7 +317,7 @@ private fun SubscriptionRow(
                 BzRowIcon(R.drawable.ic_ms_check_circle_fill, tint = Bz.Accent)
             }
             Column(Modifier.weight(1f)) {
-                Text(group.remarks, style = bzText(14.sp, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(name, style = bzText(14.sp, FontWeight.Bold).copy(textDirection = TextDirection.Content), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     stringResource(
                         R.string.bz_sub_row_state,
@@ -330,7 +332,7 @@ private fun SubscriptionRow(
         Box(Modifier.wrapContentSize(Alignment.TopEnd)) {
             BzIconButton(
                 R.drawable.ic_ms_more_vert,
-                stringResource(R.string.bz_sub_options, group.remarks),
+                stringResource(R.string.bz_sub_options, name),
                 { showMenu = true },
                 small = true,
                 tint = Bz.Muted,
@@ -355,6 +357,10 @@ private fun SubscriptionRow(
     }
 }
 
+/** The panel's service (user) name when it sent one, otherwise the stored remarks. */
+internal fun subscriptionDisplayName(group: GroupMapItem): String =
+    group.usageInfo?.serviceName?.takeIf { it.isNotBlank() } ?: group.remarks
+
 @Composable
 private fun ResellerPromo(openBot: () -> Unit) {
     Row(
@@ -363,21 +369,21 @@ private fun ResellerPromo(openBot: () -> Unit) {
             .fillMaxWidth()
             .heightIn(min = 108.dp)
             .clip(Bz.CardShape)
-            .background(Brush.horizontalGradient(listOf(Bz.Warm.copy(alpha = 0.04f), Bz.Warm.copy(alpha = 0.16f))))
-            .border(1.dp, Bz.Warm.copy(alpha = 0.28f), Bz.CardShape)
+            .background(Brush.horizontalGradient(listOf(Bz.Accent.copy(alpha = 0.03f), Bz.Accent.copy(alpha = 0.13f))))
+            .border(1.dp, Bz.Accent.copy(alpha = 0.30f), Bz.CardShape)
             .clickable(role = Role.Button, onClick = openBot)
             .semantics(mergeDescendants = true) {}
-            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.sub_tab_reseller_title), style = bzText(16.sp, FontWeight.ExtraBold))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.sub_tab_reseller_action), style = bzText(13.sp, FontWeight.ExtraBold, Bz.Warm))
-                Icon(painterResource(R.drawable.ic_ms_chevron_right), contentDescription = null, tint = Bz.Warm, modifier = Modifier.size(18.dp))
+                Text(stringResource(R.string.sub_tab_reseller_action), style = bzText(13.sp, FontWeight.ExtraBold, Bz.Accent))
+                Icon(painterResource(R.drawable.ic_ms_chevron_right), contentDescription = null, tint = Bz.Accent, modifier = Modifier.size(18.dp))
             }
         }
-        BzMark(92.dp, BzMarkTone.Warm, animate = false)
+        BzMark(84.dp, animate = false)
     }
 }
 

@@ -707,6 +707,13 @@
     <string name="bz_backup_sub">訂閱與設定</string>
     <string name="bz_version">版本 &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">基於 2dust 的 v2rayNG · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">僅這些走 VPN</string>
+    <string name="bz_apps_all_except">除這些以外全部</string>
+    <string name="bz_apps_hint_bypass">讓伊朗應用程式直連，速度更快，也不會因境外 IP 被限制。</string>
+    <string name="bz_apps_hint_only">只有勾選的應用程式使用 VPN，其他應用程式直連。</string>
+    <string name="bz_apps_search">搜尋應用程式</string>
+    <string name="bz_apps_clear_search">清除搜尋</string>
+    <string name="bz_apps_none">找不到應用程式</string>
     <plurals name="bz_days">
         <item quantity="other">%1$s 天</item>
     </plurals>

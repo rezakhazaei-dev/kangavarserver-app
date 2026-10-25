@@ -709,6 +709,13 @@
     <string name="bz_backup_sub">اشتراک‌ها و تنظیمات</string>
     <string name="bz_version">نسخه‌ی &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">بر پایه‌ی v2rayNG ساخته‌ی 2dust · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">فقط این‌ها با VPN</string>
+    <string name="bz_apps_all_except">همه به‌جز این‌ها</string>
+    <string name="bz_apps_hint_bypass">برنامه‌های ایرانی را مستقیم بگذارید تا سریع‌تر باشند و با تحریم IP خارجی مشکل نداشته باشند.</string>
+    <string name="bz_apps_hint_only">فقط برنامه‌های تیک‌خورده از VPN استفاده می‌کنند و بقیه مستقیم وصل می‌شوند.</string>
+    <string name="bz_apps_search">جستجوی برنامه</string>
+    <string name="bz_apps_clear_search">پاک کردن جستجو</string>
+    <string name="bz_apps_none">برنامه‌ای پیدا نشد</string>
     <plurals name="bz_days">
         <item quantity="one">%1$s روز</item>
         <item quantity="other">%1$s روز</item>

@@ -47,7 +47,10 @@ internal data class SubscriptionSummaryUiModel(
     /** Whole days left until expiry, rounded up; null when the subscription never expires. */
     val daysLeft: Int?,
     val expired: Boolean,
-)
+) {
+    /** Used share of the quota in 0..1, the coloured part of the bars; null when unlimited. */
+    val usedFraction: Float? get() = remainingFraction?.let { 1f - it }
+}
 
 internal fun buildSubscriptionSummary(info: SubscriptionUsageInfo, nowMillis: Long): SubscriptionSummaryUiModel {
     val unlimited = info.total <= 0L
@@ -199,3 +202,7 @@ internal fun timeAgo(thenMillis: Long, nowMillis: Long): Pair<AgoUnit, Long>? {
         else -> AgoUnit.Days to minutes / (24L * 60L)
     }
 }
+
+/** True when the foreground subscription refresh may run: first time, or [intervalMillis] after the last one. */
+internal fun shouldRefreshSubscriptionsOnOpen(lastMillis: Long?, nowMillis: Long, intervalMillis: Long): Boolean =
+    lastMillis == null || nowMillis - lastMillis >= intervalMillis || nowMillis < lastMillis

@@ -22,6 +22,11 @@ data class SubscriptionUsageInfo(
     val supportUrl: String? = null,
     /** Validated `Profile-Web-Page-Url` header. */
     val webPageUrl: String? = null,
+    /**
+     * Service (user) name from the `Content-Disposition` file name; Marzban and PasarGuard send
+     * `attachment; filename="<username>"`.
+     */
+    val serviceName: String? = null,
 ) {
     /** Bytes consumed so far (upload + download). */
     val used: Long get() = upload + download

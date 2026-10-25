@@ -707,6 +707,13 @@
     <string name="bz_backup_sub">Gói đăng ký và cài đặt</string>
     <string name="bz_version">Phiên bản &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">Dựa trên v2rayNG của 2dust · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">Chỉ những ứng dụng này</string>
+    <string name="bz_apps_all_except">Tất cả trừ những ứng dụng này</string>
+    <string name="bz_apps_hint_bypass">Để các ứng dụng Iran kết nối trực tiếp để nhanh hơn và không bị chặn vì IP nước ngoài.</string>
+    <string name="bz_apps_hint_only">Chỉ các ứng dụng được đánh dấu dùng VPN; các ứng dụng khác kết nối trực tiếp.</string>
+    <string name="bz_apps_search">Tìm ứng dụng</string>
+    <string name="bz_apps_clear_search">Xóa tìm kiếm</string>
+    <string name="bz_apps_none">Không tìm thấy ứng dụng</string>
     <plurals name="bz_days">
         <item quantity="other">%1$s ngày</item>
     </plurals>

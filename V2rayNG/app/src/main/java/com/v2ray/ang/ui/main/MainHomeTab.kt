@@ -214,13 +214,16 @@ private fun HomeMain(
             }
         } else {
             FullHeightScroll {
+                HomeTopBar(layout, onOpenAddSheet, openBot)
+                // Spare height goes above and below the hero and cards (the empty Box is the bottom
+                // end of SpaceBetween), never between them.
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    HomeTopBar(layout, onOpenAddSheet, openBot)
                     HeroBlock(phase, uiState, catalog, liveTraffic, layout, onAction)
+                    Column(Modifier.padding(top = if (layout.small || layout.compactHeight) 16.dp else 24.dp)) {
+                        CardsBlock(phase, uiState, catalog, liveTraffic, summary, layout, onSelectTab, wide = false)
+                    }
                 }
-                Column(Modifier.padding(top = 8.dp)) {
-                    CardsBlock(phase, uiState, catalog, liveTraffic, summary, layout, onSelectTab, wide = false)
-                }
+                Box(Modifier)
             }
         }
     }
@@ -670,7 +673,8 @@ private fun QuotaCard(summary: SubscriptionSummaryUiModel, numbers: BzNumbers, l
             Text(stringResource(R.string.home_remaining_traffic), style = bzText(13.sp, color = Bz.Muted), modifier = Modifier.weight(1f))
             Text(quotaText(summary, numbers), style = bzText(13.sp, color = Bz.Muted), maxLines = 1)
         }
-        summary.remainingFraction?.let { fraction ->
+        // The coloured bar is the used part; the empty track is what is left (Reza, 2026-10-25).
+        summary.usedFraction?.let { fraction ->
             Box(
                 Modifier
                     .fillMaxWidth()

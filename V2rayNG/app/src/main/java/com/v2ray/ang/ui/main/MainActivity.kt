@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
@@ -97,6 +98,12 @@ class MainActivity : HelperBaseComponentActivity() {
         mainViewModel.onAction(MainAction.Initialize)
 
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {}
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Traffic, expiry and the server list are refreshed every time the user opens the app.
+        mainViewModel.refreshSubscriptionsOnOpen(SystemClock.elapsedRealtime())
     }
 
     @Composable

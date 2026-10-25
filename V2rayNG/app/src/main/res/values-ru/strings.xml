@@ -713,6 +713,13 @@
     <string name="bz_backup_sub">Подписки и настройки</string>
     <string name="bz_version">Версия &#x2068;%1$s&#x2069;</string>
     <string name="bz_based_on">На основе v2rayNG от 2dust · GPL-3.0</string>
+    <string name="bz_apps_only_vpn">Только эти через VPN</string>
+    <string name="bz_apps_all_except">Все, кроме этих</string>
+    <string name="bz_apps_hint_bypass">Оставьте иранские приложения напрямую: так они быстрее и не блокируются из-за иностранного IP.</string>
+    <string name="bz_apps_hint_only">VPN используют только отмеченные приложения, остальные подключаются напрямую.</string>
+    <string name="bz_apps_search">Поиск приложений</string>
+    <string name="bz_apps_clear_search">Очистить поиск</string>
+    <string name="bz_apps_none">Приложения не найдены</string>
     <plurals name="bz_days">
         <item quantity="one">%1$s день</item>
         <item quantity="few">%1$s дня</item>

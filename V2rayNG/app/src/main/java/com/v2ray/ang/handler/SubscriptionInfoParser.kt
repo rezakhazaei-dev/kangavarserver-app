@@ -15,6 +15,7 @@ import java.util.Locale
  * - `Profile-Title: <text>` or `base64:<base64 text>`
  * - `Support-Url: <link>` (usually a Telegram link)
  * - `Profile-Web-Page-Url: <link>` (the panel's subscription information page)
+ * - `Content-Disposition: attachment; filename="<username>"` (Marzban, PasarGuard)
  *
  * Pure functions only, so the logic is covered by plain JVM tests.
  */
@@ -25,6 +26,12 @@ object SubscriptionInfoParser {
 
     /** Values at or above this are epoch milliseconds, not seconds (year 5138 in seconds). */
     private const val MILLIS_THRESHOLD = 100_000_000_000L
+
+    /** Remarks given to a subscription imported from a link without a #name. */
+    const val DEFAULT_REMARKS = "import sub"
+
+    /** Extensions PasarGuard appends to the user name for client-specific formats. */
+    private val FILE_EXTENSIONS = listOf(".txt", ".json", ".yaml", ".yml", ".zip", ".conf")
 
     private val SAFE_SCHEMES = setOf("http", "https", "tg")
     private val TELEGRAM_HOSTS = setOf("t.me", "telegram.me", "telegram.dog", "telegram.org")
@@ -39,14 +46,16 @@ object SubscriptionInfoParser {
         profileTitle: String?,
         supportUrl: String?,
         webPageUrl: String?,
+        contentDisposition: String? = null,
         decodeBase64: (String) -> String = Utils::decode,
     ): SubscriptionUsageInfo? {
         val fields = parseUserInfoFields(userInfo)
         val title = decodeTitle(profileTitle, decodeBase64)
         val support = sanitizeLink(supportUrl)
         val webPage = sanitizeLink(webPageUrl)
+        val service = parseServiceName(contentDisposition)
 
-        if (fields == null && title == null && support == null && webPage == null) return null
+        if (fields == null && title == null && support == null && webPage == null && service == null) return null
 
         return SubscriptionUsageInfo(
             upload = fields?.get("upload") ?: 0,
@@ -56,7 +65,34 @@ object SubscriptionInfoParser {
             title = title,
             supportUrl = support,
             webPageUrl = webPage,
+            serviceName = service,
         )
+    }
+
+    /**
+     * Reads the file name of a `Content-Disposition` header, preferring the RFC 5987
+     * `filename*=UTF-8''...` form, and drops the format extension PasarGuard adds.
+     */
+    fun parseServiceName(header: String?): String? {
+        if (header.isNullOrBlank()) return null
+        var plain: String? = null
+        var extended: String? = null
+        for (part in header.split(';')) {
+            val separator = part.indexOf('=')
+            if (separator <= 0) continue
+            val key = part.substring(0, separator).trim().lowercase(Locale.ROOT)
+            val value = part.substring(separator + 1).trim()
+            when (key) {
+                "filename" -> plain = value.removeSurrounding("\"")
+                "filename*" -> extended = value.substringAfter("''", "").takeIf { it.isNotEmpty() }?.let {
+                    runCatching { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }.getOrNull()
+                }
+            }
+        }
+        var name = (extended ?: plain)?.trim().orEmpty()
+        FILE_EXTENSIONS.firstOrNull { name.endsWith(it, ignoreCase = true) }?.let { name = name.dropLast(it.length) }
+        name = name.filterNot { it.isISOControl() }.trim()
+        return name.take(MAX_TITLE_LENGTH).ifEmpty { null }
     }
 
     /**
@@ -66,6 +102,18 @@ object SubscriptionInfoParser {
     fun withWebPageFallback(info: SubscriptionUsageInfo, subscriptionUrl: String): SubscriptionUsageInfo {
         if (info.webPageUrl != null) return info
         return info.copy(webPageUrl = sanitizeLink(subscriptionUrl))
+    }
+
+    /**
+     * Remarks to store after an update: the panel's service name replaces the default name and a
+     * name that was itself taken from the panel earlier, but never a name the user typed.
+     */
+    fun remarksAfterUpdate(currentRemarks: String, previousServiceName: String?, serviceName: String?): String {
+        if (serviceName.isNullOrBlank()) return currentRemarks
+        val automatic = currentRemarks.isBlank() ||
+            currentRemarks == DEFAULT_REMARKS ||
+            (previousServiceName != null && currentRemarks == previousServiceName)
+        return if (automatic) serviceName else currentRemarks
     }
 
     /** Returns [raw] when it is an http(s) or tg:// link that is safe to hand to ACTION_VIEW. */

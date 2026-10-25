@@ -33,6 +33,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -55,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -441,14 +444,17 @@ internal fun BzPing(delayMillis: Long, digits: (Long) -> String) {
     val level = pingLevel(delayMillis)
     val color = pingColor(pingQuality(delayMillis))
     Column(Modifier.width(46.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Row(Modifier.height(15.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
-            listOf(5.dp, 8.dp, 11.dp, 15.dp).forEachIndexed { index, barHeight ->
-                Box(
-                    Modifier
-                        .size(width = 4.dp, height = barHeight)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(if (index < level) color else Color.White.copy(alpha = 0.14f))
-                )
+        // Signal bars always rise left to right, as on the phone's own status bar, also in Persian.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Row(Modifier.height(15.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
+                listOf(5.dp, 8.dp, 11.dp, 15.dp).forEachIndexed { index, barHeight ->
+                    Box(
+                        Modifier
+                            .size(width = 4.dp, height = barHeight)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(if (index < level) color else Color.White.copy(alpha = 0.14f))
+                    )
+                }
             }
         }
         Text(

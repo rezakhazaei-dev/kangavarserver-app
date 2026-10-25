@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Round TR flag used by the server country chips and headers. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="30"
+    android:viewportHeight="30">
+    <group>
+        <clip-path android:pathData="M15,0a15,15 0,1 1,0 30a15,15 0,1 1,0 -30z" />
+        <path android:fillColor="#FFE30A17" android:pathData="M0.000,0.000h30.000v30.000h-30.000z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M5.500,15.000a7.000,7.000 0,1 1,14.000,0a7.000,7.000 0,1 1,-14.000,0z" />
+        <path android:fillColor="#FFE30A17" android:pathData="M8.700,15.000a5.600,5.600 0,1 1,11.200,0a5.600,5.600 0,1 1,-11.200,0z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M19.6,15L22.9,13.9L22.9,12.4L23.9,14.1L25.4,13.8L24.4,15L25.4,16.2L23.9,15.9L22.9,17.6L22.9,16.1Z" />
+    </group>
+</vector>

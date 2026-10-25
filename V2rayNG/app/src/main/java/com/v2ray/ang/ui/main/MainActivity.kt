@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
@@ -50,6 +51,7 @@ import com.v2ray.ang.ui.userasset.UserAssetActivity
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -98,6 +100,12 @@ class MainActivity : HelperBaseComponentActivity() {
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {}
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Traffic, expiry and the server list are refreshed every time the user opens the app.
+        mainViewModel.refreshSubscriptionsOnOpen(SystemClock.elapsedRealtime())
+    }
+
     @Composable
     override fun ScreenContent() {
         BackHandler { moveTaskToBack(false) }
@@ -118,6 +126,10 @@ class MainActivity : HelperBaseComponentActivity() {
                     is MainAction.ShareClipboard -> shareToClipboard(action.guid)
                     is MainAction.ShareFullContent -> shareFullContentAsync(action.guid)
                     is MainAction.OpenSubscriptionLink -> openSubscriptionLink(action.url)
+                    is MainAction.QuickConnect -> quickConnect(action.country)
+                    MainAction.SelectSmart -> selectSmart()
+                    MainAction.RetryOtherServer -> retryOtherServer()
+                    is MainAction.ChangeQuickSetting -> changeQuickSetting(action.setting, action.enabled)
                     else -> mainViewModel.onAction(action)
                 }
             },
@@ -170,7 +182,48 @@ class MainActivity : HelperBaseComponentActivity() {
         if (mainViewModel.uiState.value.isRunning) {
             LauncherManager.stopService(this)
         } else {
+            mainViewModel.prepareConnect()
             requestServiceStart()
+        }
+    }
+
+    /** Home quick-connect chip: the fastest server of [country], connecting or switching to it. */
+    private fun quickConnect(country: ServerCountry) {
+        if (!mainViewModel.selectCountry(country)) return
+        if (mainViewModel.uiState.value.isRunning) {
+            LauncherManager.restartService(this)
+        } else {
+            requestServiceStart()
+        }
+    }
+
+    private fun selectSmart() {
+        val changed = mainViewModel.selectSmart()
+        if (changed && mainViewModel.uiState.value.isRunning) LauncherManager.restartService(this)
+    }
+
+    /** Error screen: connect through the fastest server other than the one that failed. */
+    private fun retryOtherServer() {
+        if (mainViewModel.selectOtherServer()) {
+            requestServiceStart()
+        } else {
+            mainViewModel.onAction(MainAction.DismissConnectionError)
+        }
+    }
+
+    private fun changeQuickSetting(setting: QuickSetting, enabled: Boolean) {
+        mainViewModel.applyQuickSetting(setting, enabled)
+        if (!setting.needsRestart || !mainViewModel.uiState.value.isRunning) return
+        if (setting == QuickSetting.VpnMode) {
+            // VPN and proxy-only run as different services, so stop one and start the other;
+            // the start may need the VPN permission dialog.
+            LauncherManager.stopService(this)
+            lifecycleScope.launch {
+                delay(MODE_SWITCH_DELAY_MS)
+                requestServiceStart()
+            }
+        } else {
+            LauncherManager.restartService(this)
         }
     }
 
@@ -199,6 +252,7 @@ class MainActivity : HelperBaseComponentActivity() {
             checkAndRequestPermission(PermissionType.ACCESS_LOCAL_NETWORK) {}
         }
         LauncherManager.startService(this)
+        mainViewModel.markConnecting()
     }
 
     private fun importManually(createConfigType: Int) {
@@ -277,12 +331,14 @@ class MainActivity : HelperBaseComponentActivity() {
     }
 
     private fun setSelectServer(guid: String) {
-        val selected = mainViewModel.uiState.value.selectedGuid
-        if (guid != selected) {
+        val state = mainViewModel.uiState.value
+        if (guid != state.selectedGuid || state.smartSelect) {
             mainViewModel.updateSelectedGuid(guid)
-            LauncherManager.restartService(this)
+            if (guid != state.selectedGuid) LauncherManager.restartService(this)
         }
     }
+
+    override val alwaysDarkTheme: Boolean = true
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BUTTON_B) {
@@ -290,5 +346,10 @@ class MainActivity : HelperBaseComponentActivity() {
             return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    private companion object {
+        /** Time the stopped service needs to release the TUN device before the other mode starts. */
+        const val MODE_SWITCH_DELAY_MS = 800L
     }
 }

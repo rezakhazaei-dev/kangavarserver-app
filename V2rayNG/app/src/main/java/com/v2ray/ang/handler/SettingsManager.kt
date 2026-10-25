@@ -52,9 +52,50 @@ object SettingsManager {
     private fun initRoutingRulesets(context: Context) {
         val exist = MmkvManager.decodeRoutingRulesets()
         if (exist.isNullOrEmpty()) {
-            val rulesetList = getPresetRoutingRulesets(context)
+            // Bazhiko serves users in Iran, so new installs open Iranian sites directly.
+            val rulesetList = getPresetRoutingRulesets(context, RoutingType.WHITE_IRAN)
             MmkvManager.encodeRoutingRulesets(rulesetList)
         }
+    }
+
+    /** True when an enabled direct rule sends Iranian domains or IPs around the proxy. */
+    fun isIranDirectEnabled(): Boolean = iranDirectEnabled(MmkvManager.decodeRoutingRulesets().orEmpty())
+
+    /**
+     * Turns the "Iranian sites without VPN" rules on or off without touching other rules.
+     * Enabling re-enables existing Iran rules, or inserts the preset ones before the final catch-all rule.
+     */
+    fun setIranDirectEnabled(context: Context, enabled: Boolean) {
+        val current = MmkvManager.decodeRoutingRulesets() ?: mutableListOf()
+        val preset = getPresetRoutingRulesets(context, RoutingType.WHITE_IRAN).orEmpty()
+        MmkvManager.encodeRoutingRulesets(applyIranDirect(current, enabled, preset))
+    }
+
+    internal fun isIranRule(rule: RulesetItem): Boolean =
+        rule.outboundTag == AppConfig.TAG_DIRECT && (
+            rule.domain.orEmpty().any { it == "geosite:category-ir" || it == "domain:ir" } ||
+                rule.ip.orEmpty().any { it == "geoip:ir" }
+            )
+
+    internal fun iranDirectEnabled(rules: List<RulesetItem>): Boolean =
+        rules.any { it.enabled && isIranRule(it) }
+
+    internal fun applyIranDirect(
+        rules: List<RulesetItem>,
+        enabled: Boolean,
+        preset: List<RulesetItem>,
+    ): MutableList<RulesetItem> {
+        val hasIranRules = rules.any(::isIranRule)
+        if (!enabled || hasIranRules) {
+            return rules.mapTo(mutableListOf()) { rule ->
+                if (isIranRule(rule) && rule.enabled != enabled) rule.copy(enabled = enabled) else rule
+            }
+        }
+        val result = rules.toMutableList()
+        val catchAll = result.indexOfFirst { it.port == "0-65535" && it.domain.isNullOrEmpty() && it.ip.isNullOrEmpty() }
+        val iranRules = preset.filter(::isIranRule).map { it.copy(enabled = true) }
+        result.addAll(if (catchAll >= 0) catchAll else result.size, iranRules)
+        return result
     }
 
     /**

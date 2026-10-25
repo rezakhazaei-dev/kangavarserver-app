@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Round DE flag used by the server country chips and headers. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="30"
+    android:viewportHeight="30">
+    <group>
+        <clip-path android:pathData="M15,0a15,15 0,1 1,0 30a15,15 0,1 1,0 -30z" />
+        <path android:fillColor="#FF111111" android:pathData="M0.000,0.000h30.000v10.000h-30.000z" />
+        <path android:fillColor="#FFDD0000" android:pathData="M0.000,10.000h30.000v10.000h-30.000z" />
+        <path android:fillColor="#FFFFCE00" android:pathData="M0.000,20.000h30.000v10.000h-30.000z" />
+    </group>
+</vector>

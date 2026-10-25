@@ -5,6 +5,7 @@ import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.nullIfBlank
 import com.v2ray.ang.handler.AngConfigManager
+import java.util.Locale
 
 internal data class ServerRowUiModel(
     val guid: String,
@@ -14,11 +15,16 @@ internal data class ServerRowUiModel(
     val typeDescription: String,
     val testDelayMillis: Long,
     val subscriptionBadge: String,
+    val country: ServerCountry = serverCountryOf(remarks),
+    /** Remarks without flag emoji, for rows that draw the flag themselves. */
+    val displayName: String = serverDisplayName(remarks),
 )
 
 internal data class ServerGroupUiState(
     val servers: List<ServersCache> = emptyList(),
     val rows: List<ServerRowUiModel> = emptyList(),
+    /** True once the group was read from storage at least once. */
+    val loaded: Boolean = false,
 )
 
 internal fun buildServerRowUiModel(
@@ -38,24 +44,25 @@ internal fun buildServerRowUiModel(
     )
 }
 
-private fun serverProtocolDescription(profile: ProfileItem): String {
+internal fun serverProtocolDescription(profile: ProfileItem): String {
     if (profile.configType.isComplexType()) return profile.configType.name
     val parts = mutableListOf(profile.configType.name)
     profile.network?.let { network ->
         if (network.isNotBlank() && !network.equals("tcp", ignoreCase = true)) {
-            parts.add(network)
+            parts.add(if (network.equals("grpc", ignoreCase = true)) "gRPC" else network.uppercase(Locale.ROOT))
         }
     }
     profile.security?.let { security ->
         if (security.isNotBlank()) {
+            val label = if (security.equals("reality", ignoreCase = true)) "Reality" else security.uppercase(Locale.ROOT)
             parts.add(
                 if (profile.insecure == true && security.equals("tls", ignoreCase = true)) {
-                    "$security insecure"
+                    "$label insecure"
                 } else {
-                    security
+                    label
                 }
             )
         }
     }
-    return parts.joinToString(" / ")
+    return parts.joinToString(" · ")
 }

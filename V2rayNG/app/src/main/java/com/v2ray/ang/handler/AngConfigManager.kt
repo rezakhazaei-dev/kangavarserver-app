@@ -498,6 +498,7 @@ object AngConfigManager {
                     profileTitle = headers["Profile-Title"],
                     supportUrl = headers["Support-Url"],
                     webPageUrl = headers["Profile-Web-Page-Url"],
+                    contentDisposition = headers["Content-Disposition"],
                 )
             }
 
@@ -541,6 +542,11 @@ object AngConfigManager {
             val count = parseConfigViaSub(configText, it.guid, false)
             if (count > 0) {
                 it.subscription.lastUpdated = System.currentTimeMillis()
+                it.subscription.remarks = SubscriptionInfoParser.remarksAfterUpdate(
+                    currentRemarks = it.subscription.remarks,
+                    previousServiceName = it.subscription.usageInfo?.serviceName,
+                    serviceName = usageInfo?.serviceName,
+                )
                 // Replaced on every successful update so the box disappears if the panel stops sending the headers.
                 it.subscription.usageInfo = usageInfo
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
@@ -628,7 +634,7 @@ object AngConfigManager {
         }
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()
-        subItem.remarks = uri.fragment ?: "import sub"
+        subItem.remarks = uri.fragment ?: SubscriptionInfoParser.DEFAULT_REMARKS
         subItem.url = url
         MmkvManager.encodeSubscription("", subItem)
         return 1

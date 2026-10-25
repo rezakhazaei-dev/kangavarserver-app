@@ -60,7 +60,7 @@ class PerAppProxyViewModel(application: Application) : BaseViewModel(application
             currentSelection + packageName
         }
         replaceBlacklist(newSelection)
-        SettingsChangeManager.makeRestartService()
+        syncPerAppProxyAndRestart()
     }
 
     private fun loadBlacklist(): Set<String> {
@@ -86,6 +86,7 @@ class PerAppProxyViewModel(application: Application) : BaseViewModel(application
         if (_bypassApps.value != enabled) {
             _bypassApps.value = enabled
             MmkvManager.encodeSettings(AppConfig.PREF_BYPASS_APPS, enabled)
+            SettingsChangeManager.makeRestartService()
         }
     }
 
@@ -155,13 +156,13 @@ class PerAppProxyViewModel(application: Application) : BaseViewModel(application
             }
         }
         replaceBlacklist(newSelection)
-        enablePerAppProxyAndRestart()
+        syncPerAppProxyAndRestart()
     }
 
     fun invertSelection() {
         val packageNames = _displayedApps.value.map { it.packageName }
         replaceBlacklist(AppSelection.invert(_blacklist.value, packageNames))
-        enablePerAppProxyAndRestart()
+        syncPerAppProxyAndRestart()
     }
 
     fun selectProxyAppAuto(context: Context) {
@@ -198,7 +199,7 @@ class PerAppProxyViewModel(application: Application) : BaseViewModel(application
                 forceGoogleApps = true
             )
             if (success) {
-                enablePerAppProxyAndRestart()
+                syncPerAppProxyAndRestart()
             }
         }
     }
@@ -214,7 +215,7 @@ class PerAppProxyViewModel(application: Application) : BaseViewModel(application
                 forceGoogleApps = false
             )
             if (success) {
-                enablePerAppProxyAndRestart()
+                syncPerAppProxyAndRestart()
             }
         }
     }
@@ -259,8 +260,12 @@ class PerAppProxyViewModel(application: Application) : BaseViewModel(application
         return true
     }
 
-    private fun enablePerAppProxyAndRestart() {
-        setPerAppProxyEnabled(true)
+    /**
+     * The Bazhiko screen has no separate on/off switch: per-app routing is on while at least one
+     * app is selected, and an empty selection sends every app through the VPN.
+     */
+    private fun syncPerAppProxyAndRestart() {
+        setPerAppProxyEnabled(_blacklist.value.isNotEmpty())
         SettingsChangeManager.makeRestartService()
     }
 }

@@ -63,4 +63,12 @@ interface MainDataSource : Closeable {
 
     fun syncSubscriptions()
     fun initAssets()
+
+    fun getSmartSelect(): Boolean
+    fun setSmartSelect(enabled: Boolean)
+    fun readQuickSettings(): QuickSettingsUiModel
+    fun writeQuickSetting(setting: QuickSetting, enabled: Boolean)
+
+    /** Bytes received and sent by this app's UID since boot, or null when the device cannot tell. */
+    fun readAppTrafficBytes(): Pair<Long, Long>?
 }

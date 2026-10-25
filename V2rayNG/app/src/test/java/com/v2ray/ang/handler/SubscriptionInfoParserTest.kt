@@ -16,7 +16,8 @@ class SubscriptionInfoParserTest {
         title: String? = null,
         support: String? = null,
         web: String? = null,
-    ) = SubscriptionInfoParser.parse(userInfo, title, support, web, decode)
+        disposition: String? = null,
+    ) = SubscriptionInfoParser.parse(userInfo, title, support, web, disposition, decodeBase64 = decode)
 
     @Test
     fun noHeadersGivesNull() {
@@ -87,5 +88,40 @@ class SubscriptionInfoParserTest {
         val own = base.copy(webPageUrl = "https://p.example/info")
         assertEquals("https://p.example/info", SubscriptionInfoParser.withWebPageFallback(own, "https://p.example/sub/abc").webPageUrl)
         assertNull(SubscriptionInfoParser.withWebPageFallback(base, "not a url").webPageUrl)
+    }
+
+    @Test
+    fun serviceNameComesFromContentDisposition() {
+        assertEquals("reza_khazaei", parse(disposition = "attachment; filename=\"reza_khazaei\"")!!.serviceName)
+        // PasarGuard adds a format extension for client-specific outputs.
+        assertEquals("reza", SubscriptionInfoParser.parseServiceName("inline; filename=\"reza.json\""))
+        assertEquals("reza", SubscriptionInfoParser.parseServiceName("attachment; filename=reza.TXT"))
+        // The RFC 5987 form wins and is percent-decoded.
+        assertEquals("رضا", SubscriptionInfoParser.parseServiceName("attachment; filename=\"x\"; filename*=UTF-8''%D8%B1%D8%B6%D8%A7"))
+        assertEquals("a+b", SubscriptionInfoParser.parseServiceName("attachment; filename*=UTF-8''a+b"))
+    }
+
+    @Test
+    fun missingOrEmptyServiceNameGivesNull() {
+        assertNull(SubscriptionInfoParser.parseServiceName(null))
+        assertNull(SubscriptionInfoParser.parseServiceName("attachment"))
+        assertNull(SubscriptionInfoParser.parseServiceName("attachment; filename=\"\""))
+        assertNull(SubscriptionInfoParser.parseServiceName("attachment; filename=\".txt\""))
+        // A disposition without a file name adds nothing.
+        assertNull(parse(disposition = "attachment"))
+    }
+
+    @Test
+    fun panelNameReplacesOnlyAutomaticRemarks() {
+        val default = SubscriptionInfoParser.DEFAULT_REMARKS
+        assertEquals("reza", SubscriptionInfoParser.remarksAfterUpdate(default, null, "reza"))
+        assertEquals("reza", SubscriptionInfoParser.remarksAfterUpdate("", null, "reza"))
+        // A name taken from the panel earlier follows a rename on the panel.
+        assertEquals("reza2", SubscriptionInfoParser.remarksAfterUpdate("reza", "reza", "reza2"))
+        // A name the user typed stays.
+        assertEquals("My VPN", SubscriptionInfoParser.remarksAfterUpdate("My VPN", "reza", "reza2"))
+        // No name from the panel keeps whatever is stored.
+        assertEquals(default, SubscriptionInfoParser.remarksAfterUpdate(default, null, null))
+        assertEquals(default, SubscriptionInfoParser.remarksAfterUpdate(default, null, " "))
     }
 }

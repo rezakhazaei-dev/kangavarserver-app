@@ -459,7 +459,7 @@ object Utils {
      * @return True if the package is Xray, false otherwise.
      */
     fun isXray(): Boolean = BuildConfig.APPLICATION_ID.let {
-        it.startsWith("com.v2ray.ang") || it.startsWith("com.kango.vpn")
+        it.startsWith("com.v2ray.ang") || it.startsWith("com.bazhiko.vpn")
     }
 
     /**

@@ -10,7 +10,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.kangavarserver.app"
+        applicationId = "com.kango.vpn"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
